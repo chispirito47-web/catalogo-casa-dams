@@ -200,6 +200,28 @@ body{background:var(--paper);color:var(--ink);font-family:var(--sans);-webkit-fo
 .card-add:hover{border-color:var(--wood);color:var(--wood);background:color-mix(in srgb,var(--wood) 4%,transparent);}
 .card-add .plus{font-size:28px;font-weight:300;line-height:1;}
 .empty{grid-column:1/-1;text-align:center;padding:80px 20px;font-family:var(--serif);font-size:20px;color:var(--ink-3);}
+/* GRID DE CATEGORÍAS */
+.cat-section{margin-bottom:2px;}
+.cat-grid{display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:280px 260px;gap:2px;}
+.cat-card{position:relative;overflow:hidden;cursor:pointer;background:var(--ink);}
+.cat-card:nth-child(4){grid-column:1/3;}
+.cat-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;transition:transform .6s var(--ease);}
+.cat-card:hover .cat-img{transform:scale(1.04);}
+.cat-ph{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;}
+.cat-overlay{position:absolute;inset:0;background:linear-gradient(to top,rgba(20,16,12,.82) 0%,rgba(20,16,12,.28) 55%,rgba(20,16,12,.08) 100%);transition:opacity .4s var(--ease);}
+.cat-card:hover .cat-overlay{opacity:.92;}
+.cat-content{position:absolute;bottom:0;left:0;right:0;padding:clamp(16px,2.5vw,28px);}
+.cat-name{font-family:var(--display);font-size:clamp(22px,2.4vw,34px);font-weight:400;font-style:italic;color:#fff;margin:0 0 5px;line-height:1.1;}
+.cat-desc{font-family:var(--sans);font-size:12px;letter-spacing:.06em;color:rgba(255,255,255,.68);margin:0 0 14px;line-height:1.5;max-width:320px;}
+.cat-btn{display:inline-flex;align-items:center;gap:7px;background:rgba(234,226,214,.92);color:var(--ink);font-family:var(--sans);font-size:10px;letter-spacing:.2em;text-transform:uppercase;padding:9px 18px;border-radius:999px;border:none;cursor:pointer;transition:background .25s var(--ease);}
+.cat-btn:hover{background:#fff;}
+.cat-active .cat-overlay{opacity:.92;}
+.cat-active .cat-name{text-decoration:underline;text-underline-offset:4px;}
+@media(max-width:600px){
+  .cat-grid{grid-template-columns:repeat(2,1fr);grid-template-rows:220px 220px 220px;}
+  .cat-card:nth-child(4){grid-column:auto;}
+  .cat-card:nth-child(5){grid-column:1/-1;}
+}
 /* LOADING */
 .loading-screen{position:fixed;inset:0;background:var(--paper);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;z-index:999;}
 .loading-screen .mark{font-family:var(--display);font-size:28px;font-style:italic;color:var(--ink-2);}
@@ -669,6 +691,112 @@ const ProductCard = ({ item, index, admin, selecting, isSelected, onToggleSelect
   );
 };
 
+/* Íconos SVG simples para cada categoría (placeholder cuando no hay foto) */
+const CAT_ICONS = {
+  Comedores: (
+    <svg viewBox="0 0 80 80" fill="none" width="64" height="64" style={{opacity:.2}}>
+      <rect x="8" y="28" width="64" height="7" rx="3" fill="currentColor"/>
+      <rect x="14" y="35" width="6" height="26" rx="2" fill="currentColor"/>
+      <rect x="60" y="35" width="6" height="26" rx="2" fill="currentColor"/>
+      <ellipse cx="40" cy="24" rx="18" ry="5" fill="currentColor"/>
+      <rect x="34" y="18" width="12" height="10" rx="5" fill="currentColor"/>
+    </svg>
+  ),
+  Camas: (
+    <svg viewBox="0 0 80 80" fill="none" width="64" height="64" style={{opacity:.2}}>
+      <rect x="6" y="44" width="68" height="8" rx="3" fill="currentColor"/>
+      <rect x="6" y="52" width="8" height="18" rx="2" fill="currentColor"/>
+      <rect x="66" y="52" width="8" height="18" rx="2" fill="currentColor"/>
+      <rect x="6" y="28" width="12" height="18" rx="3" fill="currentColor"/>
+      <rect x="20" y="36" width="54" height="8" rx="2" fill="currentColor"/>
+    </svg>
+  ),
+  Salas: (
+    <svg viewBox="0 0 80 80" fill="none" width="64" height="64" style={{opacity:.2}}>
+      <rect x="10" y="38" width="60" height="18" rx="6" fill="currentColor"/>
+      <rect x="6" y="42" width="10" height="22" rx="4" fill="currentColor"/>
+      <rect x="64" y="42" width="10" height="22" rx="4" fill="currentColor"/>
+      <rect x="14" y="30" width="52" height="10" rx="4" fill="currentColor"/>
+    </svg>
+  ),
+  Sillas: (
+    <svg viewBox="0 0 80 80" fill="none" width="64" height="64" style={{opacity:.2}}>
+      <rect x="22" y="16" width="36" height="26" rx="5" fill="currentColor"/>
+      <rect x="24" y="42" width="32" height="8" rx="3" fill="currentColor"/>
+      <rect x="24" y="50" width="6" height="20" rx="2" fill="currentColor"/>
+      <rect x="50" y="50" width="6" height="20" rx="2" fill="currentColor"/>
+      <rect x="16" y="42" width="8" height="26" rx="2" fill="currentColor" opacity=".6"/>
+      <rect x="56" y="42" width="8" height="26" rx="2" fill="currentColor" opacity=".6"/>
+    </svg>
+  ),
+  Mesas: (
+    <svg viewBox="0 0 80 80" fill="none" width="64" height="64" style={{opacity:.2}}>
+      <rect x="8" y="30" width="64" height="8" rx="3" fill="currentColor"/>
+      <rect x="16" y="38" width="6" height="26" rx="2" fill="currentColor"/>
+      <rect x="58" y="38" width="6" height="26" rx="2" fill="currentColor"/>
+    </svg>
+  ),
+};
+
+const CAT_DESCS = {
+  Comedores: "Mesas y sillas para cada espacio",
+  Camas: "Descanso y diseño en perfecta armonía",
+  Salas: "Sofás y poltronas para el hogar",
+  Sillas: "Desde el comedor hasta la oficina",
+  Mesas: "Centro de living, comedor y terraza",
+};
+
+const CategoryGrid = ({ items, filter, setFilter }) => {
+  const CATS = window.CASA.CATEGORIES;
+  const gridRef = React.useRef(null);
+
+  /* Para cada categoría buscamos la primera foto disponible */
+  const catPhoto = (cat) => {
+    const found = items.find((it) => (it.category === cat) && (it.photo || it.photo_url) && !it.hidden);
+    return found ? (found.photo_url || found.photo) : null;
+  };
+
+  const handleCat = (cat) => {
+    setFilter(cat === filter ? "Todo" : cat);
+    /* Scroll suave hacia el grid de productos */
+    setTimeout(() => {
+      const grid = document.querySelector(".grid");
+      if (grid) grid.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 60);
+  };
+
+  return (
+    <div className="cat-section">
+      <div className="cat-grid" ref={gridRef}>
+        {CATS.map((cat, i) => {
+          const photo = catPhoto(cat);
+          const isActive = filter === cat;
+          return (
+            <div
+              key={cat}
+              className={"cat-card" + (isActive ? " cat-active" : "")}
+              onClick={() => handleCat(cat)}
+            >
+              {photo
+                ? <img className="cat-img" src={photo} alt={cat} />
+                : <div className="cat-ph" style={{ color: "var(--ink-2)" }}>{CAT_ICONS[cat]}</div>
+              }
+              <div className="cat-overlay" />
+              <div className="cat-content">
+                <div className="cat-name">{cat}</div>
+                <div className="cat-desc">{CAT_DESCS[cat] || ""}</div>
+                <button className="cat-btn" tabIndex={-1}>
+                  {isActive ? "Viendo esta categoría" : "Ver categoría"} →
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
 const Catalog = ({ items, admin, selecting, selected, onToggleSelect, filter, setFilter, query, setQuery, onOpen, onAdd, onEdit, onToggleHide, onDelete }) => {
   const CATS = window.CASA.CATEGORIES;
   const selSet = new Set(selected || []);
@@ -682,42 +810,49 @@ const Catalog = ({ items, admin, selecting, selected, onToggleSelect, filter, se
     });
   useReveal(filter + query + items.length + admin);
   return (
-    <div className="catalog view-enter">
-      <div className="catalog-head">
-        <div>
-          <div className="kicker">Colección · 2026</div>
-          <h1>El <em>catálogo</em></h1>
+    <div className="catalog view-enter" style={{ padding: 0, maxWidth: "none" }}>
+      {/* Grid de categorías — solo visible cuando no se está en modo selección */}
+      {!selecting && (
+        <CategoryGrid items={items} filter={filter} setFilter={setFilter} />
+      )}
+      <div style={{ maxWidth: 1600, margin: "0 auto", padding: "clamp(24px,4vh,48px) clamp(12px,2vw,32px)" }}>
+        <div className="catalog-head">
+          <div>
+            <div className="kicker">Colección · 2026</div>
+            <h1>El <em>catálogo</em></h1>
+          </div>
+          <div className="catalog-count">
+            {visible.length} {visible.length === 1 ? "pieza" : "piezas"}
+            {filter !== "Todo" && <span style={{ color: "var(--wood)" }}> · {filter}</span>}
+            {admin && !selecting && <span style={{ color: "var(--ink-3)" }}> · modo edición</span>}
+            {selecting && <span style={{ color: "var(--wood)" }}> · elige para tu cliente</span>}
+          </div>
         </div>
-        <div className="catalog-count">
-          {visible.length} {visible.length === 1 ? "pieza" : "piezas"}
-          {admin && !selecting && <span style={{ color: "var(--ink-3)" }}> · modo edición</span>}
-          {selecting && <span style={{ color: "var(--wood)" }}> · elige para tu cliente</span>}
+        <div className="toolbar">
+          <div className="chips">
+            <button className={"chip" + (filter === "Todo" ? " on" : "")} onClick={() => setFilter("Todo")}>Todo</button>
+            {CATS.map((c) => (
+              <button key={c} className={"chip" + (filter === c ? " on" : "")} onClick={() => setFilter(c)}>{c}</button>
+            ))}
+          </div>
+          <div className="search">
+            <Icon name="search" />
+            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar pieza, referencia…" />
+          </div>
         </div>
-      </div>
-      <div className="toolbar">
-        <div className="chips">
-          <button className={"chip" + (filter === "Todo" ? " on" : "")} onClick={() => setFilter("Todo")}>Todo</button>
-          {CATS.map((c) => (
-            <button key={c} className={"chip" + (filter === c ? " on" : "")} onClick={() => setFilter(c)}>{c}</button>
+        <div className="grid">
+          {admin && !selecting && (
+            <button className="card-add" onClick={onAdd}>
+              <span className="plus">+</span>Agregar mueble
+            </button>
+          )}
+          {visible.map((it, i) => (
+            <ProductCard key={it.id} item={it} index={i} admin={admin} selecting={selecting}
+              isSelected={selSet.has(it.id)} onToggleSelect={onToggleSelect}
+              onOpen={onOpen} onEdit={onEdit} onToggleHide={onToggleHide} onDelete={onDelete} />
           ))}
+          {visible.length === 0 && !admin && <div className="empty">No hay piezas en esta categoría por ahora.</div>}
         </div>
-        <div className="search">
-          <Icon name="search" />
-          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar pieza, referencia…" />
-        </div>
-      </div>
-      <div className="grid">
-        {admin && !selecting && (
-          <button className="card-add" onClick={onAdd}>
-            <span className="plus">+</span>Agregar mueble
-          </button>
-        )}
-        {visible.map((it, i) => (
-          <ProductCard key={it.id} item={it} index={i} admin={admin} selecting={selecting}
-            isSelected={selSet.has(it.id)} onToggleSelect={onToggleSelect}
-            onOpen={onOpen} onEdit={onEdit} onToggleHide={onToggleHide} onDelete={onDelete} />
-        ))}
-        {visible.length === 0 && !admin && <div className="empty">No hay piezas en esta categoría por ahora.</div>}
       </div>
     </div>
   );
