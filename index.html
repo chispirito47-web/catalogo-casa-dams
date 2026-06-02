@@ -587,7 +587,7 @@ const supa = supabase.createClient(SUPA_URL, SUPA_KEY);
     });
     if (error) { console.error("Error subiendo video:", error); return null; }
     const { data } = supa.storage.from("catalogo-fotos").getPublicUrl(path);
-    return data.publicUrl + "?t=" + Date.now();
+    return data.publicUrl;
   }
 
   function mapRow(row) {
