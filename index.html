@@ -451,11 +451,11 @@ const supa = supabase.createClient(SUPA_URL, SUPA_KEY);
 
   /* Subir video de portada a Storage (ruta fija) */
   async function uploadCoverVideo(file) {
-    const ext = (file.name.split(".").pop() || "mp4").toLowerCase();
+    const ext = "mp4";
     const path = `_portada/cover.${ext}`;
     await supa.storage.from("catalogo-fotos").remove([path]);
     const { error } = await supa.storage.from("catalogo-fotos").upload(path, file, {
-      upsert: true, contentType: file.type,
+      upsert: true, contentType: "video/mp4",
     });
     if (error) { console.error("Error subiendo video:", error); return { error: error.message || JSON.stringify(error) }; }
     const { data } = supa.storage.from("catalogo-fotos").getPublicUrl(path);
@@ -1016,7 +1016,7 @@ const Cover = ({ onEnter, heroSrc, videoSrc, posterSrc, admin, uploading, onPick
             ? <span className="cover-uploading"><Icon name="spinner" style={{ width: 15, height: 15, animation: "spin 1s linear infinite" }} /> Subiendo video…</span>
             : <label className="cover-vbtn">
                 <Icon name="film" /> {videoSrc ? "Cambiar video" : "Subir video de portada"}
-                <input type="file" accept="video/*" onChange={onPickVideo} />
+                <input type="file" accept="video/mp4" onChange={onPickVideo} />
               </label>}
         </div>
       )}
