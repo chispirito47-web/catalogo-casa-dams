@@ -451,13 +451,13 @@ const supa = supabase.createClient(SUPA_URL, SUPA_KEY);
 
   /* Subir video de portada a Storage (ruta fija) */
   async function uploadCoverVideo(file) {
-    const ext = "mp4";
+    const ext = (file.name.split(".").pop() || "mp4").toLowerCase();
     const path = `_portada/cover.${ext}`;
     await supa.storage.from("catalogo-fotos").remove([path]);
     const { error } = await supa.storage.from("catalogo-fotos").upload(path, file, {
       upsert: true, contentType: "video/mp4",
     });
-    if (error) { console.error("Error subiendo video:", error); return { error: error.message || JSON.stringify(error) }; }
+    if (error) { console.error("Error subiendo video:", error); return null; }
     const { data } = supa.storage.from("catalogo-fotos").getPublicUrl(path);
     return data.publicUrl + "?t=" + Date.now();
   }
@@ -1387,14 +1387,13 @@ function App() {
     if (file.size > 95 * 1024 * 1024) { flash("El video es muy pesado (máx. ~90 MB)"); return; }
     setCoverUploading(true);
     const url = await CASA.uploadCoverVideo(file);
-    if (url && typeof url === "string") {
+    if (url) {
       const next = { ...cover, videoUrl: url };
       setCover(next);
       await CASA.saveSettings(next);
       flash("Video de portada actualizado");
     } else {
-      const msg = (url && url.error) ? url.error : "Error desconocido";
-      flash("Error: " + msg);
+      flash("No se pudo subir el video — intenta de nuevo");
     }
     setCoverUploading(false);
   };
