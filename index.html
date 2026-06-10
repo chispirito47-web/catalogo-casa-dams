@@ -324,15 +324,22 @@ body{background:var(--paper);color:var(--ink);font-family:var(--sans);-webkit-fo
 .client-ownerbar{background:var(--card);border-bottom:1px solid var(--line);padding:14px clamp(18px,4vw,56px);display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;}
 .client-owner-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
 .owner-hint{font-family:var(--sans);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);}
-.client-hero{text-align:center;padding:clamp(48px,8vh,96px) clamp(18px,8vw,120px) clamp(32px,5vh,56px);}
-.client-hero h1{font-family:var(--display);font-size:clamp(40px,7vw,88px);font-weight:400;margin:8px 0 24px;line-height:1.1;}
+.client-hero{text-align:center;padding:clamp(52px,9vh,104px) clamp(28px,8vw,100px) clamp(44px,6vh,72px);background:var(--ink);color:var(--paper);position:relative;overflow:hidden;}
+.client-hero-bg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--display);font-size:clamp(80px,30vw,280px);font-weight:600;font-style:italic;color:rgba(234,226,214,.038);letter-spacing:-.02em;pointer-events:none;user-select:none;white-space:nowrap;line-height:1;}
+.client-hero .kicker{color:rgba(234,226,214,.45);position:relative;z-index:1;}
+.client-hero .brand{position:relative;z-index:1;}
+.client-hero .brand .mark{color:rgba(234,226,214,.75);}
+.client-hero h1{font-family:var(--display);font-size:clamp(38px,7vw,80px);font-weight:400;margin:14px 0 0;line-height:1.1;color:var(--paper);position:relative;z-index:1;}
 .client-hero h1 em{font-style:italic;}
-.client-note{font-family:var(--serif);font-size:18px;color:var(--ink-2);line-height:1.7;max-width:520px;margin:0 auto;}
-.client-note-edit{font-family:var(--serif);font-size:16px;color:var(--ink-2);background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 16px;width:min(520px,100%);outline:none;resize:vertical;line-height:1.7;}
-.client-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:24px;max-width:1200px;margin:0 auto;padding:0 clamp(18px,4vw,56px) 80px;}
-.client-foot{text-align:center;padding:40px 20px;border-top:1px solid var(--line-soft);}
-.client-foot .mark{font-family:var(--display);font-size:22px;font-style:italic;color:var(--ink-2);}
-.client-foot .web{font-family:var(--sans);font-size:10px;letter-spacing:.3em;text-transform:uppercase;color:var(--ink-3);margin-top:4px;}
+.client-hero-rule{width:32px;height:1px;background:var(--wood);margin:20px auto;opacity:.8;position:relative;z-index:1;}
+.client-note{font-family:var(--serif);font-size:clamp(15px,2vw,18px);color:rgba(234,226,214,.62);line-height:1.8;max-width:460px;margin:0 auto;position:relative;z-index:1;}
+.client-note-edit{font-family:var(--serif);font-size:16px;color:rgba(234,226,214,.8);background:rgba(234,226,214,.07);border:1px solid rgba(234,226,214,.18);border-radius:10px;padding:12px 16px;width:min(500px,100%);outline:none;resize:vertical;line-height:1.7;position:relative;z-index:1;}
+.client-note-edit::placeholder{color:rgba(234,226,214,.3);}
+.client-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:2px;padding-bottom:0;}
+@media(min-width:768px){.client-grid{grid-template-columns:repeat(3,1fr);}}
+.client-foot{text-align:center;padding:52px 20px 60px;background:var(--ink);border-top:none;}
+.client-foot .mark{font-family:var(--display);font-size:22px;font-style:italic;color:rgba(234,226,214,.75);}
+.client-foot .web{font-family:var(--sans);font-size:10px;letter-spacing:.3em;text-transform:uppercase;color:rgba(234,226,214,.38);margin-top:4px;margin-bottom:28px;}
 .foot{text-align:center;padding:48px 20px;border-top:1px solid var(--line-soft);}
 .foot .mark{font-family:var(--display);font-size:20px;font-style:italic;color:var(--ink-2);}
 .foot .web{font-family:var(--sans);font-size:10px;letter-spacing:.3em;text-transform:uppercase;color:var(--ink-3);margin-top:4px;}
@@ -450,8 +457,8 @@ body{background:var(--paper);color:var(--ink);font-family:var(--sans);-webkit-fo
     .field-row{ grid-template-columns:1fr; }
 
     /* ---- Vista de cliente ---- */
-    .client-hero{ padding:40px 22px 28px; }
-    .client-grid{ grid-template-columns:repeat(2,1fr); gap:12px; padding:0 14px 70px; }
+    .client-hero{ padding:44px 22px 36px; }
+    .client-grid{ grid-template-columns:repeat(2,1fr); gap:2px; padding:0; }
     .client-ownerbar{ padding:12px 14px; gap:10px; }
 
     /* ---- Barra de selección ---- */
@@ -1455,11 +1462,13 @@ const ClientView = ({ items, ids, note, owner, onSetNote, onOpen, onExit, onCopy
         </div>
       )}
       <header className="client-hero">
-        <div className="brand center" style={{ justifyContent: "center" }}>
+        <div className="client-hero-bg" aria-hidden="true">DAMS</div>
+        <div className="brand center" style={{ justifyContent: "center", position: "relative", zIndex: 1 }}>
           <span className="mark">Casa <em>DAMS</em></span>
         </div>
-        <div className="kicker" style={{ marginTop: 18 }}>Selección personalizada</div>
+        <div className="kicker" style={{ marginTop: 16 }}>Selección personalizada</div>
         <h1>Elegimos esto<br/><em>para tu espacio</em></h1>
+        <div className="client-hero-rule" />
         {owner
           ? <textarea className="client-note-edit" value={note} onChange={(e) => onSetNote(e.target.value)} rows={2} placeholder="Escribe un mensaje para tu cliente…" />
           : note && <p className="client-note">{note}</p>
