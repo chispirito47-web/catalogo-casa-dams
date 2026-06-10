@@ -939,7 +939,7 @@ const Catalog = ({ items, admin, selecting, selected, onToggleSelect, filter, se
       const q = query.toLowerCase();
       return (it.name + " " + it.category + " " + (it.ref || "") + " " + (it.description || "")).toLowerCase().includes(q);
     });
-  useReveal(filter + query + items.length + admin);
+  useReveal(filter + query + items.length + admin + selecting);
   return (
     <div className="catalog view-enter" style={{ padding: 0, maxWidth: "none" }}>
       {/* Grid de categorías — solo visible cuando no se está en modo selección */}
