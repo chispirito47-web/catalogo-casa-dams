@@ -114,7 +114,7 @@ body{background:var(--paper);color:var(--ink);font-family:var(--sans);-webkit-fo
 .barcode{display:flex;gap:3px;align-items:flex-end;height:44px;}
 .barcode i{display:block;height:100%;background:rgba(234,226,214,.6);border-radius:1px;flex-shrink:0;}
 /* VIDEO DE PORTADA */
-.cover-video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;background:#1d1813;}
+.cover-video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;background:#1d1813;transition:opacity .6s var(--ease);}
 .cover-hero .ph{animation:coverDrift 26s ease-in-out infinite alternate;}
 @keyframes coverDrift{from{transform:scale(1.04);}to{transform:scale(1.12) translateY(-1.5%);}}
 .cover-grad{background:linear-gradient(to bottom,rgba(29,24,19,.34) 0%,rgba(29,24,19,.10) 34%,rgba(29,24,19,.55) 78%,rgba(29,24,19,.86) 100%);}
@@ -1211,27 +1211,36 @@ Object.assign(window, { Detail, Lightbox });
 
 <!-- Cover -->
 <script type="text/babel" data-presets="react-classic">
-const Cover = ({ onEnter, heroSrc, videoSrc, posterSrc, admin, uploading, onPickVideo }) => (
-  <div className="cover view-enter">
-    <div className="cover-spine left">Casa DAMS · Mobiliario</div>
-    <div className="cover-stage">
-      <div className="cover-hero">
-        {videoSrc
-          ? <video className="cover-video" src={videoSrc} poster={posterSrc || undefined}
-                   autoPlay muted loop playsInline preload="auto" />
-          : <Img src={posterSrc || heroSrc} label="Foto de ambiente · portada" />}
-      </div>
-      <div className="cover-grad"></div>
-      <div className="cover-vignette"></div>
+const Cover = ({ onEnter, heroSrc, videoSrc, posterSrc, admin, uploading, onPickVideo }) => {
+  const [videoFailed, setVideoFailed] = React.useState(false);
+  const [videoReady, setVideoReady] = React.useState(false);
+  React.useEffect(() => { setVideoFailed(false); setVideoReady(false); }, [videoSrc]);
+  const showVideo = videoSrc && !videoFailed;
+  return (
+    <div className="cover view-enter">
+      <div className="cover-spine left">Casa DAMS · Mobiliario</div>
+      <div className="cover-stage">
+        <div className="cover-hero">
+          <Img src={posterSrc || heroSrc} label="Foto de ambiente · portada" />
+          {showVideo && (
+            <video className="cover-video" src={videoSrc} poster={posterSrc || undefined}
+                   autoPlay muted loop playsInline preload="metadata"
+                   onCanPlay={() => setVideoReady(true)}
+                   onError={() => setVideoFailed(true)}
+                   style={{ opacity: videoReady ? 1 : 0 }} />
+          )}
+        </div>
+        <div className="cover-grad"></div>
+        <div className="cover-vignette"></div>
 
-      {admin && (
-        <div className="cover-admin-edit">
-          {uploading
-            ? <span className="cover-uploading"><Icon name="spinner" style={{ width: 15, height: 15, animation: "spin 1s linear infinite" }} /> Subiendo video…</span>
-            : <label className="cover-vbtn">
-                <Icon name="film" /> {videoSrc ? "Cambiar video" : "Subir video de portada"}
-                <input type="file" accept="video/mp4" onChange={onPickVideo} />
-              </label>}
+        {admin && (
+          <div className="cover-admin-edit">
+            {uploading
+              ? <span className="cover-uploading"><Icon name="spinner" style={{ width: 15, height: 15, animation: "spin 1s linear infinite" }} /> Subiendo video…</span>
+              : <label className="cover-vbtn">
+                  <Icon name="film" /> {videoSrc ? "Cambiar video" : "Subir video de portada"}
+                  <input type="file" accept="video/mp4" onChange={onPickVideo} />
+                </label>}
         </div>
       )}
 
@@ -1258,7 +1267,8 @@ const Cover = ({ onEnter, heroSrc, videoSrc, posterSrc, admin, uploading, onPick
     </div>
     <div className="cover-spine">Dining Room · Living</div>
   </div>
-);
+  );
+};
 Object.assign(window, { Cover });
 </script>
 
@@ -1667,6 +1677,15 @@ function App() {
     const file = e.target.files && e.target.files[0];
     if (!file) return;
     if (file.size > 95 * 1024 * 1024) { flash("El video es muy pesado (máx. ~90 MB)"); return; }
+    if (file.size > 25 * 1024 * 1024) {
+      const mb = (file.size / (1024 * 1024)).toFixed(1);
+      const ok = window.confirm(
+        `El video pesa ${mb} MB. En celular con datos móviles puede tardar mucho o no cargar.\n\n` +
+        `Recomendado: comprimirlo a menos de 15-20 MB (por ejemplo con Handbrake, CapCut o un compresor online) antes de subirlo.\n\n` +
+        `¿Subir de todas formas?`
+      );
+      if (!ok) return;
+    }
     setCoverUploading(true);
     const url = await CASA.uploadCoverVideo(file);
     if (url) {
