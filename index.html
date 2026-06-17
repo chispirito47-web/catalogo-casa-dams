@@ -1076,9 +1076,24 @@ const Lightbox = ({ images, index, label, onClose, onNav }) => {
     };
   }, []);
   const multi = images.length > 1;
+  const touchRef = React.useRef({ x: 0, y: 0, active: false });
+  const onTouchStart = (e) => {
+    const t = e.touches[0];
+    touchRef.current = { x: t.clientX, y: t.clientY, active: true };
+  };
+  const onTouchEnd = (e) => {
+    if (!touchRef.current.active || !multi) return;
+    touchRef.current.active = false;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - touchRef.current.x;
+    const dy = t.clientY - touchRef.current.y;
+    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) {
+      onNav(dx < 0 ? 1 : -1);
+    }
+  };
   return (
     <div className="lightbox" onClick={onClose}>
-      <div className="lightbox-inner" onClick={(e) => e.stopPropagation()}>
+      <div className="lightbox-inner" onClick={(e) => e.stopPropagation()} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
         <button className="lightbox-close" onClick={onClose} title="Cerrar"><Icon name="x" /></button>
         {multi && <button className="lightbox-nav prev" onClick={() => onNav(-1)}><Icon name="arrowL" /></button>}
         <img className="lightbox-img" src={images[index]} alt={label} />
@@ -1103,8 +1118,8 @@ const Detail = ({ item, related, onBack, onOpen, onShare }) => {
   const canZoom = !!gallery[activeImg];
   const openLightbox = () => { if (canZoom) setLightbox(true); };
   const navLightbox = (dir) => setLightbox((prev) => {
-    if (typeof prev !== "number") return prev;
-    return (prev + dir + realImages.length) % realImages.length;
+    const base = typeof prev === "number" ? prev : Math.max(0, realImages.indexOf(gallery[activeImg]));
+    return (base + dir + realImages.length) % realImages.length;
   });
   const lbIndex = lightbox === true ? Math.max(0, realImages.indexOf(gallery[activeImg])) : lightbox;
   return (
