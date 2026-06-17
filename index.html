@@ -186,14 +186,15 @@ body{background:var(--paper);color:var(--ink);font-family:var(--sans);-webkit-fo
 .card-media{position:relative;aspect-ratio:3/4;}
 .card-media .ph{width:100%;height:100%;}
 .card-tag{position:absolute;top:14px;left:14px;}
+.card-tag .badge{background:rgba(42,37,31,.92);border:none;color:#fff;font-weight:500;box-shadow:0 2px 8px rgba(0,0,0,.18);}
 .card-fav{position:absolute;bottom:12px;right:12px;}
 .card-select{position:absolute;top:10px;right:10px;width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,.95);border:2px solid rgba(42,37,31,.25);display:flex;align-items:center;justify-content:center;color:var(--ink);box-shadow:0 2px 8px rgba(0,0,0,.18);transition:all .2s var(--ease);}
 .card-select.on{background:var(--wood);border-color:var(--wood);color:#fff;transform:scale(1.1);box-shadow:0 4px 14px rgba(138,110,84,.45);}
 .card-select svg{width:15px;height:15px;}
 .card-admin{position:absolute;top:10px;right:10px;display:flex;gap:4px;background:color-mix(in srgb,var(--card) 85%,transparent);backdrop-filter:blur(8px);border-radius:8px;padding:4px;}
-.card-body{padding:14px 4px 20px;display:flex;flex-direction:column;}
+.card-body{padding:14px 4px 20px;display:flex;flex-direction:column;min-width:0;}
 .card-cat{font-family:var(--sans);font-size:10px;letter-spacing:.24em;text-transform:uppercase;color:var(--ink-3);}
-.card-name{font-family:var(--display);font-size:20px;margin:4px 0 6px;font-weight:400;font-style:italic;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.22;min-height:calc(1.22em * 2);}
+.card-name{font-family:var(--display);font-size:20px;margin:4px 0 6px;font-weight:400;font-style:italic;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.22;min-height:calc(1.22em * 2);overflow-wrap:break-word;word-break:break-word;}
 .card-meta{display:flex;justify-content:space-between;align-items:baseline;margin-top:auto;}
 .card-dim{font-family:var(--sans);font-size:11px;color:var(--ink-3);}
 .card-price{font-family:var(--serif);font-size:15px;color:var(--ink);}
