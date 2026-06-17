@@ -98,10 +98,10 @@ body{background:var(--paper);color:var(--ink);font-family:var(--sans);-webkit-fo
 .fade-in{animation:fadeIn .5s var(--ease) both;}
 @keyframes fadeIn{from{opacity:0;}to{opacity:1;}}
 /* PORTADA */
-.cover{display:grid;grid-template-columns:48px 1fr 48px;min-height:100vh;overflow:hidden;}
+.cover{display:grid;grid-template-columns:48px 1fr 48px;min-height:100vh;min-height:100svh;overflow:hidden;}
+.cover-stage{position:relative;overflow:hidden;min-height:100vh;min-height:100svh;}
 .cover-spine{writing-mode:vertical-rl;font-family:var(--sans);font-size:9px;letter-spacing:.3em;text-transform:uppercase;color:var(--ink-3);display:flex;align-items:center;justify-content:center;border-right:1px solid var(--line);}
 .cover-spine:last-child{border-right:none;border-left:1px solid var(--line);}
-.cover-stage{position:relative;overflow:hidden;}
 .cover-hero{position:absolute;inset:0;}
 .cover-hero .ph{width:100%;height:100%;background-color:#C5B49E;}
 .cover-grad{position:absolute;inset:0;background:linear-gradient(to bottom,rgba(42,37,31,.18) 0%,rgba(42,37,31,.72) 100%);}
@@ -492,6 +492,14 @@ body{background:var(--paper);color:var(--ink);font-family:var(--sans);-webkit-fo
     .card-name{ font-size:18px; min-height:calc(1.22em * 2); }
   }
   </style>
+  <!-- Google Analytics (GA4) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-XBYB18FGCV"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-XBYB18FGCV');
+  </script>
 </head>
 <body>
 <div id="root"></div>
@@ -650,6 +658,28 @@ const supa = supabase.createClient(SUPA_URL, SUPA_KEY);
     if (error) console.error("Error ocultando:", error);
   }
 
+  /* ---- Registrar vista de producto (para estadísticas) ---- */
+  async function registerView(itemId, itemName, category) {
+    try {
+      const { error } = await supa.rpc("registrar_vista_producto", {
+        p_producto_id: itemId, p_nombre: itemName || "", p_categoria: category || "",
+      });
+      if (error) console.error("Error registrando vista:", error);
+    } catch (e) {
+      console.error("Error registrando vista:", e);
+    }
+  }
+
+  /* ---- Cargar estadísticas de vistas para el panel admin ---- */
+  async function loadStats() {
+    const { data, error } = await supa
+      .from("catalogo_vistas")
+      .select("*")
+      .order("total_vistas", { ascending: false });
+    if (error) { console.error("Error cargando estadísticas:", error); return []; }
+    return data || [];
+  }
+
   /* ---- Upload de foto a Storage ---- */
   async function uploadPhoto(file, itemId) {
     const ext = file.name.split(".").pop();
@@ -717,6 +747,7 @@ const supa = supabase.createClient(SUPA_URL, SUPA_KEY);
     load, saveItem, deleteItem, toggleHidden, uploadPhoto, uid, blank,
     loadSettings, saveSettings, uploadCoverVideo,
     uploadGalleryPhoto, deleteGalleryPhoto,
+    registerView, loadStats,
     adminHash: ADMIN_HASH_VAL,
     logoUrl: LOGO_URL,
     SEED, mapRow,
@@ -1631,7 +1662,87 @@ const ClientView = ({ items, ids, note, owner, onSetNote, onOpen, onExit, onCopy
   );
 };
 
-Object.assign(window, { SelectionBar, ClientView });
+const Stats = ({ onBack }) => {
+  const [rows, setRows] = React.useState(null);
+  const [error, setError] = React.useState(false);
+  React.useEffect(() => {
+    CASA.loadStats()
+      .then((data) => setRows(data))
+      .catch(() => setError(true));
+  }, []);
+  const totalVistas = rows ? rows.reduce((sum, r) => sum + (r.total_vistas || 0), 0) : 0;
+  const porCategoria = React.useMemo(() => {
+    if (!rows) return [];
+    const map = {};
+    rows.forEach((r) => {
+      const cat = r.categoria || "Sin categoría";
+      map[cat] = (map[cat] || 0) + (r.total_vistas || 0);
+    });
+    return Object.entries(map).sort((a, b) => b[1] - a[1]);
+  }, [rows]);
+  return (
+    <div className="detail view-enter">
+      <button className="detail-back" onClick={onBack}><Icon name="arrowL" /> Volver</button>
+      <div className="detail-card" style={{ padding: "28px clamp(20px,4vw,40px) 40px" }}>
+        <h1 className="cover-headline" style={{ marginBottom: 6 }}>Estadísticas del catálogo</h1>
+        <p style={{ fontFamily: "var(--sans)", fontSize: 13, color: "var(--ink-3)", marginBottom: 28 }}>
+          Cada vez que un cliente abre el detalle de una pieza, se cuenta como una vista. Las vistas tuyas en modo edición no se cuentan.
+        </p>
+
+        {error && <div className="empty">No se pudieron cargar las estadísticas. Verifica tu conexión.</div>}
+
+        {!error && rows === null && (
+          <div className="empty"><Icon name="spinner" style={{ width: 22, height: 22, animation: "spin 1s linear infinite" }} /></div>
+        )}
+
+        {rows !== null && rows.length === 0 && (
+          <div className="empty">Todavía no hay vistas registradas. Aparecerán aquí cuando los clientes empiecen a ver productos.</div>
+        )}
+
+        {rows !== null && rows.length > 0 && (
+          <>
+            <div style={{ display: "flex", gap: 16, marginBottom: 32, flexWrap: "wrap" }}>
+              <div style={{ flex: "1 1 160px", border: "1px solid var(--line)", borderRadius: 12, padding: "18px 20px" }}>
+                <div className="spec-key">Total de vistas</div>
+                <div style={{ fontFamily: "var(--display)", fontSize: 32, fontStyle: "italic", marginTop: 4 }}>{totalVistas}</div>
+              </div>
+              <div style={{ flex: "1 1 160px", border: "1px solid var(--line)", borderRadius: 12, padding: "18px 20px" }}>
+                <div className="spec-key">Piezas con al menos 1 vista</div>
+                <div style={{ fontFamily: "var(--display)", fontSize: 32, fontStyle: "italic", marginTop: 4 }}>{rows.length}</div>
+              </div>
+            </div>
+
+            <div className="subhead" style={{ marginBottom: 14 }}>Vistas por categoría</div>
+            <div style={{ marginBottom: 32 }}>
+              {porCategoria.map(([cat, n]) => (
+                <div key={cat} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: "1px solid var(--line)", fontFamily: "var(--sans)", fontSize: 13 }}>
+                  <span>{cat}</span>
+                  <span style={{ color: "var(--ink-3)" }}>{n} {n === 1 ? "vista" : "vistas"}</span>
+                </div>
+              ))}
+            </div>
+
+            <div className="subhead" style={{ marginBottom: 14 }}>Piezas más vistas</div>
+            <div>
+              {rows.slice(0, 30).map((r, i) => (
+                <div key={r.producto_id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: "1px solid var(--line)", fontFamily: "var(--sans)", fontSize: 13 }}>
+                  <span style={{ display: "flex", gap: 10, alignItems: "baseline" }}>
+                    <span style={{ color: "var(--ink-3)", fontSize: 11, minWidth: 18 }}>{i + 1}.</span>
+                    <span>{r.nombre || "Sin nombre"}</span>
+                    <span style={{ color: "var(--ink-3)", fontSize: 11 }}>{r.categoria}</span>
+                  </span>
+                  <span style={{ fontWeight: 500 }}>{r.total_vistas} {r.total_vistas === 1 ? "vista" : "vistas"}</span>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
+Object.assign(window, { SelectionBar, ClientView, Stats });
 </script>
 
 <!-- App root -->
@@ -1672,6 +1783,24 @@ function App() {
       });
     CASA.loadSettings().then((s) => setCover(s)).catch(() => {});
   }, []);
+
+  /* Reportar cada cambio de sección a Google Analytics, ya que el catálogo es una sola página */
+  useEffect(() => {
+    if (typeof window.gtag !== "function") return;
+    const pagePaths = {
+      cover: "/portada",
+      catalog: "/catalogo",
+      client: "/seleccion-cliente",
+      stats: "/estadisticas",
+      detail: current ? "/producto/" + (current.id || "") : "/producto",
+    };
+    const pageTitle = view === "detail" && current ? "Producto: " + (current.name || "") : "Casa DAMS — " + view;
+    window.gtag("event", "page_view", {
+      page_path: pagePaths[view] || "/" + view,
+      page_title: pageTitle,
+      page_location: window.location.href,
+    });
+  }, [view, current]);
 
   const onPickCoverVideo = async (e) => {
     const file = e.target.files && e.target.files[0];
@@ -1720,9 +1849,13 @@ function App() {
     flash._t = setTimeout(() => setToast(null), 2200);
   }, []);
 
-  const openProduct = (item, from) => { setCurrent(item); setDetailReturn(from || "catalog"); setView("detail"); };
+  const openProduct = (item, from) => {
+    setCurrent(item); setDetailReturn(from || "catalog"); setView("detail");
+    if (!admin && item && item.id) CASA.registerView(item.id, item.name, item.category);
+  };
   const goCatalog = () => setView("catalog");
   const goCover = () => setView("cover");
+  const goStats = () => setView("stats");
 
   const startSelecting = () => { setAdmin(false); setView("catalog"); setSelecting(true); };
   const cancelSelecting = () => setSelecting(false);
@@ -1834,9 +1967,12 @@ function App() {
           </div>
           <nav className="top-nav">
             <button className={"top-link" + (view === "cover" ? " active" : "")} onClick={goCover}>Portada</button>
-            <button className={"top-link" + (view !== "cover" && view !== "client" ? " active" : "")} onClick={() => { setSelecting(false); goCatalog(); }}>Catálogo</button>
+            <button className={"top-link" + (view !== "cover" && view !== "client" && view !== "stats" ? " active" : "")} onClick={() => { setSelecting(false); goCatalog(); }}>Catálogo</button>
             {!selecting && view !== "client" && (
               <button className="top-link" onClick={startSelecting}>Selección</button>
+            )}
+            {admin && (
+              <button className={"top-link" + (view === "stats" ? " active" : "")} onClick={goStats}>Estadísticas</button>
             )}
             {admin && (
               <button className={"admin-toggle on"} onClick={() => { setAdmin(false); setSelecting(false); }}>
@@ -1850,7 +1986,7 @@ function App() {
 
       {view === "cover" && (
         <Cover onEnter={goCatalog}
-          heroSrc={items.find((i) => i.photo || i.photo_url)?.photo_url || null}
+          heroSrc={items.find((i) => i.photo || i.photo_url)?.photo || items.find((i) => i.photo || i.photo_url)?.photo_url || null}
           videoSrc={cover.videoUrl} posterSrc={cover.posterUrl}
           admin={admin} uploading={coverUploading} onPickVideo={onPickCoverVideo} />
       )}
@@ -1864,6 +2000,8 @@ function App() {
           {!selecting && <footer className="foot"><div className="mark">Casa DAMS</div><div className="web">Mobiliario · Diseño contemporáneo</div></footer>}
         </>
       )}
+
+      {view === "stats" && admin && <Stats onBack={goCatalog} />}
 
       {view === "client" && (
         <ClientView items={items} ids={selected} note={clientNote} owner={clientOwner}
