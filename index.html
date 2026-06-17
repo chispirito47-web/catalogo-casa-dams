@@ -686,6 +686,7 @@ const supa = supabase.createClient(SUPA_URL, SUPA_KEY);
     loadSettings, saveSettings, uploadCoverVideo,
     adminHash: ADMIN_HASH_VAL,
     logoUrl: LOGO_URL,
+    SEED, mapRow,
   };
 })();
 </script>
@@ -1288,8 +1289,13 @@ const Editor = ({ initial, onClose, onSave, onUploadPhoto }) => {
     const file = e.target.files && e.target.files[0];
     if (!file) return;
     setUploading(true);
-    const url = await CASA.uploadPhoto(file, d.id);
-    if (url) { set("photo_url", url); set("photo", url); }
+    try {
+      const url = await CASA.uploadPhoto(file, d.id);
+      if (url) { set("photo_url", url); set("photo", url); }
+    } catch (err) {
+      console.error("Fallo subiendo foto:", err);
+      alert("No se pudo subir la foto, intenta de nuevo");
+    }
     setUploading(false);
   };
 
@@ -1527,8 +1533,14 @@ function App() {
 
   /* Cargar desde Supabase al iniciar */
   useEffect(() => {
-    CASA.load().then((data) => { setItems(data); setLoading(false); });
-    CASA.loadSettings().then((s) => setCover(s));
+    CASA.load()
+      .then((data) => { setItems(data); setLoading(false); })
+      .catch((err) => {
+        console.error("Fallo de red cargando catálogo:", err);
+        setItems(CASA.SEED.map(CASA.mapRow));
+        setLoading(false);
+      });
+    CASA.loadSettings().then((s) => setCover(s)).catch(() => {});
   }, []);
 
   const onPickCoverVideo = async (e) => {
