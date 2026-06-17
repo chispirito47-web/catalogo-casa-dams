@@ -288,6 +288,13 @@ body{background:var(--paper);color:var(--ink);font-family:var(--sans);-webkit-fo
 .photo-drop span{font-family:var(--sans);font-size:12px;color:var(--ink-3);}
 .photo-x{position:absolute;top:8px;right:8px;background:rgba(42,37,31,.6);color:#fff;border-radius:50%;padding:4px;}
 .photo-x:hover{background:var(--ink);color:var(--paper);}
+.gallery-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(72px,1fr));gap:8px;margin-top:8px;}
+.gallery-thumb{position:relative;border-radius:8px;overflow:hidden;aspect-ratio:1;background:var(--card-soft);border:1px solid var(--line);}
+.gallery-thumb img{width:100%;height:100%;object-fit:cover;display:block;}
+.gallery-thumb .photo-x{padding:3px;}
+.gallery-add{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;border:2px dashed var(--line);border-radius:8px;aspect-ratio:1;cursor:pointer;transition:border-color .2s var(--ease);}
+.gallery-add:hover{border-color:var(--wood);}
+.gallery-add span{font-family:var(--sans);font-size:9px;color:var(--ink-3);text-align:center;line-height:1.3;}
 .subhead{font-family:var(--sans);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-3);display:flex;align-items:center;justify-content:space-between;}
 .mini-add{background:none;border:1px solid var(--line);border-radius:999px;padding:4px 10px;font-family:var(--sans);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);cursor:pointer;display:inline-flex;align-items:center;gap:4px;transition:all .2s var(--ease);}
 .mini-add:hover{border-color:var(--ink);color:var(--ink);}
@@ -657,6 +664,30 @@ const supa = supabase.createClient(SUPA_URL, SUPA_KEY);
     return data.publicUrl + "?t=" + Date.now();
   }
 
+  /* ---- Upload de foto de galería (path único, no sobrescribe nada) ---- */
+  async function uploadGalleryPhoto(file, itemId) {
+    const ext = file.name.split(".").pop();
+    const unique = Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 6);
+    const path = `${itemId}-gal-${unique}.${ext}`;
+    const { error } = await supa.storage.from("catalogo-fotos").upload(path, file, {
+      upsert: true, contentType: file.type,
+    });
+    if (error) { console.error("Error subiendo foto de galería:", error); return null; }
+    const { data } = supa.storage.from("catalogo-fotos").getPublicUrl(path);
+    return data.publicUrl;
+  }
+
+  /* ---- Borrar foto de galería de Storage a partir de su URL pública ---- */
+  async function deleteGalleryPhoto(url) {
+    if (!url) return;
+    try {
+      const fileName = url.split("/catalogo-fotos/")[1]?.split("?")[0];
+      if (fileName) await supa.storage.from("catalogo-fotos").remove([decodeURIComponent(fileName)]);
+    } catch (err) {
+      console.error("Error borrando foto de galería:", err);
+    }
+  }
+
   function uid() {
     return "p-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 6);
   }
@@ -684,6 +715,7 @@ const supa = supabase.createClient(SUPA_URL, SUPA_KEY);
     CATEGORIES, STATUS, FINISH_PALETTE, DIM_SUGGEST,
     load, saveItem, deleteItem, toggleHidden, uploadPhoto, uid, blank,
     loadSettings, saveSettings, uploadCoverVideo,
+    uploadGalleryPhoto, deleteGalleryPhoto,
     adminHash: ADMIN_HASH_VAL,
     logoUrl: LOGO_URL,
     SEED, mapRow,
@@ -1275,6 +1307,7 @@ const Editor = ({ initial, onClose, onSave, onUploadPhoto }) => {
   const CASA = window.CASA;
   const [d, setD] = React.useState(() => JSON.parse(JSON.stringify(initial)));
   const [uploading, setUploading] = React.useState(false);
+  const [galleryUploading, setGalleryUploading] = React.useState(false);
 
   const set = (k, v) => setD((p) => ({ ...p, [k]: v }));
   const setDim = (i, k, v) => setD((p) => { const dims = p.dimensions.slice(); dims[i] = { ...dims[i], [k]: v }; return { ...p, dimensions: dims }; });
@@ -1297,6 +1330,39 @@ const Editor = ({ initial, onClose, onSave, onUploadPhoto }) => {
       alert("No se pudo subir la foto, intenta de nuevo");
     }
     setUploading(false);
+  };
+
+  /* Galería: agrega una o varias fotos adicionales sin reemplazar la principal */
+  const onGalleryAdd = async (e) => {
+    const files = e.target.files ? Array.from(e.target.files) : [];
+    if (files.length === 0) return;
+    setGalleryUploading(true);
+    const uploaded = [];
+    for (const file of files) {
+      try {
+        const url = await CASA.uploadGalleryPhoto(file, d.id);
+        if (url) uploaded.push(url);
+      } catch (err) {
+        console.error("Fallo subiendo foto de galería:", err);
+      }
+    }
+    if (uploaded.length > 0) {
+      setD((p) => ({ ...p, gallery: [...(p.gallery || []), ...uploaded] }));
+    }
+    if (uploaded.length < files.length) {
+      alert("Algunas fotos no se pudieron subir, intenta de nuevo con esas.");
+    }
+    setGalleryUploading(false);
+    e.target.value = "";
+  };
+
+  const onGalleryRemove = (idx) => {
+    setD((p) => {
+      const removed = p.gallery[idx];
+      // Borrado en Storage en segundo plano; no bloquea la edición
+      CASA.deleteGalleryPhoto(removed);
+      return { ...p, gallery: p.gallery.filter((_, j) => j !== idx) };
+    });
   };
 
   const onCategory = (cat) => {
@@ -1337,6 +1403,26 @@ const Editor = ({ initial, onClose, onSave, onUploadPhoto }) => {
                 </button>
               )}
             </label>
+          </div>
+          <div className="field">
+            <label>Fotos adicionales (galería)</label>
+            <div className="gallery-grid">
+              {(d.gallery || []).map((url, i) => (
+                <div className="gallery-thumb" key={i}>
+                  <img src={url} alt="" />
+                  <button className="icon-btn photo-x" onClick={(e) => { e.preventDefault(); onGalleryRemove(i); }} title="Quitar">
+                    <Icon name="x" />
+                  </button>
+                </div>
+              ))}
+              <label className="gallery-add">
+                {galleryUploading
+                  ? <Icon name="spinner" style={{ width: 18, height: 18, animation: "spin 1s linear infinite" }} />
+                  : <><Icon name="image" style={{ width: 18, height: 18 }} /><span>Agregar</span></>
+                }
+                <input type="file" accept="image/*" multiple onChange={onGalleryAdd} style={{ display: "none" }} disabled={galleryUploading} />
+              </label>
+            </div>
           </div>
           <div className="field">
             <label>Nombre de la pieza</label>
