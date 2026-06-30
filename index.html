@@ -583,17 +583,16 @@ const supa = supabase.createClient(SUPA_URL, SUPA_KEY);
 
   const COVER_ID = "__cover__";
 
-  /* Cargar configuración de portada (video + poster) */
+  /* Cargar configuración de portada (imagen) */
   async function loadSettings() {
     const { data, error } = await supa
       .from("catalogo_productos")
       .select("*")
       .eq("id", COVER_ID)
       .maybeSingle();
-    if (error || !data) return { videoUrl: null, posterUrl: null };
+    if (error || !data) return { imageUrl: null };
     return {
-      videoUrl: data.photo_url || null,
-      posterUrl: (data.gallery && data.gallery[0]) || null,
+      imageUrl: data.photo_url || null,
     };
   }
 
@@ -758,23 +757,22 @@ const supa = supabase.createClient(SUPA_URL, SUPA_KEY);
   }
 
   /* Guardar configuración de portada — via Edge Function */
-  async function saveSettings({ videoUrl, posterUrl }) {
-    await callAdmin("saveSettings", { videoUrl, posterUrl });
+  async function saveSettings({ imageUrl }) {
+    await callAdmin("saveSettings", { videoUrl: imageUrl, posterUrl: null });
     return true;
   }
 
-  /* Subir video de portada a Storage (sigue siendo directo — Storage permite subida con anon key
-     si el bucket tiene política de INSERT. El RLS de la tabla está protegido.) */
-  async function uploadCoverVideo(file) {
-    const ext = (file.name.split(".").pop() || "mp4").toLowerCase();
+  /* Subir imagen de portada a Storage */
+  async function uploadCoverImage(file) {
+    const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
     const path = `_portada/cover.${ext}`;
     await supa.storage.from("catalogo-fotos").remove([path]);
     const { error } = await supa.storage.from("catalogo-fotos").upload(path, file, {
-      upsert: true, contentType: "video/mp4",
+      upsert: true, contentType: file.type || "image/jpeg",
     });
-    if (error) { console.error("Error subiendo video:", error); return null; }
+    if (error) { console.error("Error subiendo imagen de portada:", error); return null; }
     const { data } = supa.storage.from("catalogo-fotos").getPublicUrl(path);
-    return data.publicUrl;
+    return data.publicUrl + "?t=" + Date.now();
   }
 
   /* Borrar foto de galería de Storage */
@@ -798,7 +796,7 @@ const supa = supabase.createClient(SUPA_URL, SUPA_KEY);
   window.CASA = {
     CATEGORIES, STATUS, FINISH_PALETTE, DIM_SUGGEST,
     load, saveItem, deleteItem, toggleHidden, uploadPhoto, uid, blank,
-    loadSettings, saveSettings, uploadCoverVideo, uploadProductVideo,
+    loadSettings, saveSettings, uploadCoverImage, uploadProductVideo,
     uploadGalleryPhoto, deleteGalleryPhoto,
     registerView, loadStats,
     adminHash: ADMIN_HASH_VAL,
@@ -1349,24 +1347,14 @@ Object.assign(window, { Detail, Lightbox });
 
 <!-- Cover -->
 <script type="text/babel" data-presets="react-classic">
-const Cover = ({ onEnter, heroSrc, videoSrc, posterSrc, admin, uploading, onPickVideo }) => {
-  const [videoFailed, setVideoFailed] = React.useState(false);
-  const [videoReady, setVideoReady] = React.useState(false);
-  React.useEffect(() => { setVideoFailed(false); setVideoReady(false); }, [videoSrc]);
-  const showVideo = videoSrc && !videoFailed;
+const Cover = ({ onEnter, heroSrc, imageSrc, admin, uploading, onPickImage }) => {
+  const src = imageSrc || heroSrc;
   return (
     <div className="cover view-enter">
       <div className="cover-spine left">Casa DAMS · Mobiliario</div>
       <div className="cover-stage">
         <div className="cover-hero">
-          <Img src={posterSrc || heroSrc} label="Foto de ambiente · portada" />
-          {showVideo && (
-            <video className="cover-video" src={videoSrc} poster={posterSrc || undefined}
-                   autoPlay muted loop playsInline preload="metadata"
-                   onCanPlay={() => setVideoReady(true)}
-                   onError={() => setVideoFailed(true)}
-                   style={{ opacity: videoReady ? 1 : 0 }} />
-          )}
+          <Img src={src} label="Foto de portada" />
         </div>
         <div className="cover-grad"></div>
         <div className="cover-vignette"></div>
@@ -1374,10 +1362,10 @@ const Cover = ({ onEnter, heroSrc, videoSrc, posterSrc, admin, uploading, onPick
         {admin && (
           <div className="cover-admin-edit">
             {uploading
-              ? <span className="cover-uploading"><Icon name="spinner" style={{ width: 15, height: 15, animation: "spin 1s linear infinite" }} /> Subiendo video…</span>
+              ? <span className="cover-uploading"><Icon name="spinner" style={{ width: 15, height: 15, animation: "spin 1s linear infinite" }} /> Subiendo imagen…</span>
               : <label className="cover-vbtn">
-                  <Icon name="film" /> {videoSrc ? "Cambiar video" : "Subir video de portada"}
-                  <input type="file" accept="video/mp4" onChange={onPickVideo} />
+                  <Icon name="image" /> {imageSrc ? "Cambiar imagen" : "Subir imagen de portada"}
+                  <input type="file" accept="image/jpeg,image/jpg,image/png,image/webp" onChange={onPickImage} />
                 </label>}
         </div>
       )}
@@ -1912,7 +1900,7 @@ function App() {
   const [selecting, setSelecting] = useState(false);
   const [selected, setSelected] = useState([]);
   const [clientOwner, setClientOwner] = useState(true);
-  const [cover, setCover] = useState({ videoUrl: null, posterUrl: null });
+  const [cover, setCover] = useState({ imageUrl: null });
   const [coverUploading, setCoverUploading] = useState(false);
   const DEFAULT_NOTE = "Estas son las piezas que elegimos para tu espacio. Toca cualquiera para ver medidas, acabados y todos los detalles.";
   const [clientNote, setClientNote] = useState(DEFAULT_NOTE);
@@ -1947,28 +1935,19 @@ function App() {
     });
   }, [view, current]);
 
-  const onPickCoverVideo = async (e) => {
+  const onPickCoverImage = async (e) => {
     const file = e.target.files && e.target.files[0];
     if (!file) return;
-    if (file.size > 95 * 1024 * 1024) { flash("El video es muy pesado (máx. ~90 MB)"); return; }
-    if (file.size > 25 * 1024 * 1024) {
-      const mb = (file.size / (1024 * 1024)).toFixed(1);
-      const ok = window.confirm(
-        `El video pesa ${mb} MB. En celular con datos móviles puede tardar mucho o no cargar.\n\n` +
-        `Recomendado: comprimirlo a menos de 15-20 MB (por ejemplo con Handbrake, CapCut o un compresor online) antes de subirlo.\n\n` +
-        `¿Subir de todas formas?`
-      );
-      if (!ok) return;
-    }
+    if (file.size > 20 * 1024 * 1024) { flash("La imagen es muy pesada (máx. 20 MB)"); return; }
     setCoverUploading(true);
-    const url = await CASA.uploadCoverVideo(file);
+    const url = await CASA.uploadCoverImage(file);
     if (url) {
-      const next = { ...cover, videoUrl: url };
+      const next = { imageUrl: url };
       setCover(next);
       await CASA.saveSettings(next);
-      flash("Video de portada actualizado");
+      flash("Imagen de portada actualizada");
     } else {
-      flash("No se pudo subir el video — intenta de nuevo");
+      flash("No se pudo subir la imagen — intenta de nuevo");
     }
     setCoverUploading(false);
   };
@@ -2132,8 +2111,8 @@ function App() {
       {view === "cover" && (
         <Cover onEnter={goCatalog}
           heroSrc={items.find((i) => i.photo || i.photo_url)?.photo || items.find((i) => i.photo || i.photo_url)?.photo_url || null}
-          videoSrc={cover.videoUrl} posterSrc={cover.posterUrl}
-          admin={admin} uploading={coverUploading} onPickVideo={onPickCoverVideo} />
+          imageSrc={cover.imageUrl}
+          admin={admin} uploading={coverUploading} onPickImage={onPickCoverImage} />
       )}
 
       {view === "catalog" && (
