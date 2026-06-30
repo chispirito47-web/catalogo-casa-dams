@@ -201,6 +201,11 @@ body{background:var(--paper);color:var(--ink);font-family:var(--sans);-webkit-fo
 .card-add{border:1px dashed var(--line);border-radius:0;background:transparent;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;font-family:var(--sans);font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink-3);aspect-ratio:3/4;transition:all .3s var(--ease);}
 .card-add:hover{border-color:var(--wood);color:var(--wood);background:color-mix(in srgb,var(--wood) 4%,transparent);}
 .card-add .plus{font-size:28px;font-weight:300;line-height:1;}
+.card-video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .4s cubic-bezier(.22,.61,.36,1);pointer-events:none;z-index:1;}
+.card-media:hover .card-video{opacity:1;}
+.card-video-badge{position:absolute;bottom:12px;left:12px;z-index:2;width:28px;height:28px;border-radius:50%;background:rgba(20,16,12,.55);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .3s cubic-bezier(.22,.61,.36,1);}
+.card-media:hover .card-video-badge{opacity:1;}
+.card-video-badge svg{width:11px;height:11px;fill:white;margin-left:2px;}
 .empty{grid-column:1/-1;text-align:center;padding:80px 20px;font-family:var(--serif);font-size:20px;color:var(--ink-3);}
 /* GRID DE CATEGORÍAS */
 .cat-section{margin-bottom:2px;}
@@ -718,9 +723,27 @@ const supa = supabase.createClient(SUPA_URL, SUPA_KEY);
       photo_url: item.photo_url || item.photo || null,
       gallery: item.gallery || [],
       hidden: item.hidden || false,
+      video_url: item.video_url || null,
     };
     const data = await callAdmin("saveItem", row);
     return data ? mapRow(data) : null;
+  }
+
+  /* ---- Upload de video de producto a Storage ---- */
+  async function uploadProductVideo(file, itemId) {
+    const ext = (file.name.split(".").pop() || "mp4").toLowerCase();
+    // Borrar cualquier versión previa del video de este producto (mp4, mov, webm)
+    await Promise.allSettled(["mp4","mov","webm","avi"].map(e =>
+      supa.storage.from("catalogo-fotos").remove([`${itemId}-video.${e}`])
+    ));
+    const path = `${itemId}-video.${ext}`;
+    const { error } = await supa.storage.from("catalogo-fotos").upload(path, file, {
+      upsert: true, contentType: file.type || "video/mp4",
+    });
+    if (error) { console.error("Error subiendo video de producto:", error); return null; }
+    const { data } = supa.storage.from("catalogo-fotos").getPublicUrl(path);
+    // Cache-bust para que no quede el video viejo en memoria
+    return data.publicUrl + "?t=" + Date.now();
   }
 
   /* Eliminar producto — via Edge Function */
@@ -774,7 +797,7 @@ const supa = supabase.createClient(SUPA_URL, SUPA_KEY);
   window.CASA = {
     CATEGORIES, STATUS, FINISH_PALETTE, DIM_SUGGEST,
     load, saveItem, deleteItem, toggleHidden, uploadPhoto, uid, blank,
-    loadSettings, saveSettings, uploadCoverVideo,
+    loadSettings, saveSettings, uploadCoverVideo, uploadProductVideo,
     uploadGalleryPhoto, deleteGalleryPhoto,
     registerView, loadStats,
     adminHash: ADMIN_HASH_VAL,
@@ -889,16 +912,37 @@ function useReveal(dep) {
 
 const ProductCard = ({ item, index, admin, selecting, isSelected, onToggleSelect, onOpen, onEdit, onToggleHide, onDelete }) => {
   const [fin, setFin] = React.useState(0);
+  const videoRef = React.useRef(null);
   const firstDim = item.dimensions && item.dimensions[0];
   const handleClick = () => { if (selecting) { onToggleSelect(item); } else { onOpen(item); } };
+  const handleMouseEnter = () => { if (videoRef.current) { videoRef.current.currentTime = 0; videoRef.current.play().catch(() => {}); } };
+  const handleMouseLeave = () => { if (videoRef.current) { videoRef.current.pause(); videoRef.current.currentTime = 0; } };
   return (
     <article
       className={"card reveal" + (item.hidden ? " hidden-item" : "") + (selecting ? " selecting" : "") + (isSelected ? " selected" : "")}
       style={{ transitionDelay: (index % 4) * 60 + "ms" }}
       onClick={handleClick}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
     >
       <div className="card-media">
         <Img src={item.photo || item.photo_url} label={item.category} />
+        {item.video_url && (
+          <video
+            ref={videoRef}
+            className="card-video"
+            src={item.video_url}
+            muted
+            playsInline
+            loop
+            preload="none"
+          />
+        )}
+        {item.video_url && !selecting && !admin && (
+          <div className="card-video-badge" title="Tiene video de ambientación">
+            <svg viewBox="0 0 24 24"><polygon points="5,3 19,12 5,21" /></svg>
+          </div>
+        )}
         <div className="card-tag"><StatusBadge status={item.status} /></div>
         {selecting && (
           <div className={"card-select" + (isSelected ? " on" : "")}>
@@ -1173,10 +1217,13 @@ const Detail = ({ item, related, onBack, onOpen, onShare }) => {
   if (!item) return null;
   const gallery = [item.photo || item.photo_url, ...(item.gallery || [])];
   if (gallery.length === 0) gallery.push(null);
+  const hasVideo = !!item.video_url;
   const views = ["Frontal", "3/4", "Lateral", "Posterior"];
   const finishName = item.finishes && item.finishes[fin] ? item.finishes[fin].name : "—";
   const realImages = gallery.filter(Boolean);
-  const canZoom = !!gallery[activeImg];
+  // activeImg === gallery.length es el índice especial del video
+  const isVideoActive = hasVideo && activeImg === gallery.length;
+  const canZoom = !isVideoActive && !!gallery[activeImg];
   const openLightbox = () => { if (canZoom) setLightbox(true); };
   const navLightbox = (dir) => setLightbox((prev) => {
     const base = typeof prev === "number" ? prev : Math.max(0, realImages.indexOf(gallery[activeImg]));
@@ -1189,16 +1236,45 @@ const Detail = ({ item, related, onBack, onOpen, onShare }) => {
       <div className="detail-card">
         <div className="detail-top">
           <div className="detail-gallery">
-            <div className="detail-hero" onClick={openLightbox} style={{ cursor: canZoom ? "zoom-in" : "default" }}>
-              <Img key={activeImg} src={gallery[activeImg]} label={item.category + " · " + (views[activeImg] || "Vista")} />
-              {canZoom && <span className="zoom-hint"><Icon name="zoom" /></span>}
+            <div className="detail-hero" onClick={!isVideoActive ? openLightbox : undefined} style={{ cursor: canZoom ? "zoom-in" : "default", position: "relative" }}>
+              {isVideoActive ? (
+                <video
+                  key={item.video_url}
+                  src={item.video_url}
+                  style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", borderRadius: 4 }}
+                  controls autoPlay muted playsInline loop
+                />
+              ) : (
+                <>
+                  <Img key={activeImg} src={gallery[activeImg]} label={item.category + " · " + (views[activeImg] || "Vista")} />
+                  {canZoom && <span className="zoom-hint"><Icon name="zoom" /></span>}
+                </>
+              )}
             </div>
             <div className="detail-thumbs">
               {views.map((v, i) => (
-                <button key={i} className={"detail-thumb" + (i === activeImg ? " sel" : "")} onClick={() => setActiveImg(i)}>
+                <button key={i} className={"detail-thumb" + (i === activeImg && !isVideoActive ? " sel" : "")} onClick={() => setActiveImg(i)}>
                   <Img src={gallery[i] || null} label="" />
                 </button>
               ))}
+              {hasVideo && (
+                <button
+                  className={"detail-thumb" + (isVideoActive ? " sel" : "")}
+                  onClick={() => setActiveImg(gallery.length)}
+                  title="Ver video de ambientación"
+                  style={{ position: "relative", overflow: "hidden" }}
+                >
+                  <video src={item.video_url} style={{ width: "100%", height: "100%", objectFit: "cover", pointerEvents: "none" }} muted playsInline preload="metadata" />
+                  <div style={{
+                    position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center",
+                    background: "rgba(20,16,12,.38)", backdropFilter: "blur(1px)",
+                  }}>
+                    <svg viewBox="0 0 24 24" fill="white" width="22" height="22" style={{ filter: "drop-shadow(0 2px 4px rgba(0,0,0,.6))" }}>
+                      <polygon points="5,3 19,12 5,21" />
+                    </svg>
+                  </div>
+                </button>
+              )}
             </div>
           </div>
           <div className="detail-info">
@@ -1415,6 +1491,7 @@ const Editor = ({ initial, onClose, onSave, onUploadPhoto }) => {
   const [d, setD] = React.useState(() => JSON.parse(JSON.stringify(initial)));
   const [uploading, setUploading] = React.useState(false);
   const [galleryUploading, setGalleryUploading] = React.useState(false);
+  const [videoUploading, setVideoUploading] = React.useState(false);
 
   const set = (k, v) => setD((p) => ({ ...p, [k]: v }));
   const setDim = (i, k, v) => setD((p) => { const dims = p.dimensions.slice(); dims[i] = { ...dims[i], [k]: v }; return { ...p, dimensions: dims }; });
@@ -1472,6 +1549,21 @@ const Editor = ({ initial, onClose, onSave, onUploadPhoto }) => {
     });
   };
 
+
+  const onProductVideo = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setVideoUploading(true);
+    try {
+      const url = await CASA.uploadProductVideo(file, d.id);
+      if (url) set("video_url", url);
+    } catch (err) {
+      console.error("Fallo subiendo video:", err);
+      alert("No se pudo subir el video, intenta de nuevo");
+    }
+    setVideoUploading(false);
+    e.target.value = "";
+  };
   const onCategory = (cat) => {
     setD((p) => {
       const empty = p.dimensions.every((x) => !x.label && !x.value);
@@ -1530,6 +1622,26 @@ const Editor = ({ initial, onClose, onSave, onUploadPhoto }) => {
                 <input type="file" accept="image/*" multiple onChange={onGalleryAdd} style={{ display: "none" }} disabled={galleryUploading} />
               </label>
             </div>
+          </div>
+          <div className="field">
+            <label>Video de ambientación</label>
+            {d.video_url ? (
+              <div style={{ position: "relative", borderRadius: 10, overflow: "hidden", background: "var(--card-soft)", border: "1px solid var(--line)" }}>
+                <video src={d.video_url} style={{ width: "100%", maxHeight: 180, display: "block", objectFit: "cover" }} controls muted playsInline />
+                <button className="icon-btn photo-x" style={{ position: "absolute", top: 8, right: 8, background: "rgba(42,37,31,.55)", color: "#fff", borderRadius: "50%" }}
+                  onClick={(e) => { e.preventDefault(); set("video_url", null); }} title="Quitar video">
+                  <Icon name="x" />
+                </button>
+              </div>
+            ) : (
+              <label className="photo-drop" style={{ minHeight: 80 }}>
+                {videoUploading
+                  ? <><Icon name="spinner" style={{ width: 22, height: 22, animation: "spin 1s linear infinite" }} /><span>Subiendo video…</span></>
+                  : <><Icon name="image" style={{ width: 22, height: 22 }} /><span>Subir video (máx. recomendado: 50 MB · mp4)</span></>
+                }
+                <input type="file" accept="video/*" onChange={onProductVideo} style={{ display: "none" }} disabled={videoUploading} />
+              </label>
+            )}
           </div>
           <div className="field">
             <label>Nombre de la pieza</label>
