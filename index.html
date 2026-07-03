@@ -2094,7 +2094,7 @@ function App() {
           <nav className="top-nav">
             <button className={"top-link" + (view === "cover" ? " active" : "")} onClick={goCover}>Portada</button>
             <button className={"top-link" + (view !== "cover" && view !== "client" && view !== "stats" ? " active" : "")} onClick={() => { setSelecting(false); goCatalog(); }}>Catálogo</button>
-            {!selecting && view !== "client" && (
+            {admin && !selecting && view !== "client" && (
               <button className="top-link" onClick={startSelecting}>Selección</button>
             )}
             {admin && (
