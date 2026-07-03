@@ -1888,7 +1888,7 @@ function App() {
   const CASA = window.CASA;
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [view, setView] = useState("cover");
+  const [view, setView] = useState(window.innerWidth <= 600 ? "catalog" : "cover");
   const [current, setCurrent] = useState(null);
   const [detailReturn, setDetailReturn] = useState("catalog");
   const [admin, setAdmin] = useState(false);
