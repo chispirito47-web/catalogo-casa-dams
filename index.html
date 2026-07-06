@@ -839,37 +839,32 @@ const supa = supabase.createClient(SUPA_URL, SUPA_KEY);
     }
   }
 
-  /* ---- Guardar lead de captación y enviar WhatsApp de bienvenida ---- */
+  /* ---- Guardar lead de captación y enviar a Brevo ---- */
   async function saveLead({ nombre, whatsapp, correo }) {
     // 1. Guardar en Supabase tabla leads_catalogo
     const { error } = await supa.from("leads_catalogo").insert({
       nombre: nombre.trim(),
-      whatsapp: whatsapp.trim().replace(/\D/g, ""),
+      whatsapp: "",
       correo: correo.trim().toLowerCase(),
       origen: "catalogo_web",
       created_at: new Date().toISOString(),
     });
     if (error) { console.error("Error guardando lead:", error); throw error; }
 
-    // 2. Enviar WhatsApp de bienvenida via WAHA (proxy Vercel o directo)
-    const numero = whatsapp.trim().replace(/\D/g, "");
-    const numConCodigo = numero.startsWith("57") ? numero : "57" + numero;
-    const mensaje = `¡Hola ${nombre.trim()}! 👋 Gracias por registrarte en el catálogo de *Casa DAMS*.\n\nTe avisaremos sobre nuestras ofertas, descuentos y novedades en muebles. 🛋️\n\n¿Hay algún mueble que te haya llamado la atención? Con gusto te asesoramos. 😊`;
-
+    // 2. Agregar contacto a Brevo via proxy Vercel
     try {
-      // Intentar via proxy Vercel (mismo dominio, evita CORS)
-      await fetch("/api/waha", {
+      await fetch("/api/brevo", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          chatId: numConCodigo + "@c.us",
-          text: mensaje,
-          session: "default",
+          email: correo.trim().toLowerCase(),
+          attributes: { NOMBRE: nombre.trim() },
+          listIds: [2],
+          updateEnabled: true,
         }),
       });
     } catch (e) {
-      console.warn("WhatsApp de bienvenida no enviado (WAHA no disponible):", e);
-      // No lanzar error — el lead ya quedó guardado en Supabase
+      console.warn("Brevo no disponible:", e);
     }
   }
 
