@@ -143,6 +143,41 @@ body{background:var(--paper);color:var(--ink);font-family:var(--sans);-webkit-fo
 .wa-float::before{content:"";position:absolute;inset:0;border-radius:50%;border:2px solid rgba(37,211,102,.5);animation:waPulse 2.6s var(--ease) infinite;}
 @keyframes waPulse{0%{transform:scale(1);opacity:.7;}70%{transform:scale(1.5);opacity:0;}100%{opacity:0;}}
 @media(prefers-reduced-motion:reduce){.wa-float::before{animation:none;}.cover-hero .ph{animation:none;}}
+/* POPUP DE CAPTACIÓN — aparece automático estilo boutique */
+.lead-overlay{position:fixed;inset:0;z-index:500;background:rgba(20,16,12,.65);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;animation:fadeIn .35s var(--ease);padding:20px;}
+.lead-box{background:var(--card);border-radius:24px;width:min(420px,100%);box-shadow:var(--shadow-lift);display:flex;flex-direction:column;overflow:hidden;position:relative;}
+.lead-box-hero{background:var(--ink);padding:32px 32px 28px;text-align:center;position:relative;}
+.lead-box-hero::after{content:"";position:absolute;bottom:-1px;left:0;right:0;height:24px;background:var(--card);border-radius:24px 24px 0 0;}
+.lead-box-hero .kicker{color:rgba(234,226,214,.5);margin-bottom:10px;}
+.lead-box-discount{font-family:var(--display);font-size:52px;font-weight:600;font-style:italic;color:var(--paper);line-height:1;margin-bottom:4px;letter-spacing:-.01em;}
+.lead-box-subtitle{font-family:var(--sans);font-size:12px;letter-spacing:.22em;text-transform:uppercase;color:rgba(234,226,214,.6);}
+.lead-box-body{padding:28px 30px 30px;display:flex;flex-direction:column;gap:0;}
+.lead-box-desc{font-family:var(--serif);font-size:16px;color:var(--ink-2);text-align:center;line-height:1.6;margin-bottom:22px;}
+.lead-fields{display:flex;flex-direction:column;gap:10px;margin-bottom:14px;}
+.lead-field input{font-family:var(--sans);font-size:14px;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:13px 16px;outline:none;transition:border-color .2s var(--ease);width:100%;}
+.lead-field input:focus{border-color:var(--wood);}
+.lead-field input::placeholder{color:var(--ink-3);}
+.lead-privacy{display:flex;align-items:flex-start;gap:9px;margin-bottom:18px;}
+.lead-privacy input[type=checkbox]{width:15px;height:15px;accent-color:var(--wood);cursor:pointer;flex-shrink:0;margin-top:2px;}
+.lead-privacy span{font-family:var(--sans);font-size:10.5px;color:var(--ink-3);line-height:1.55;}
+.lead-submit{width:100%;padding:15px;font-family:var(--sans);font-size:12px;letter-spacing:.2em;text-transform:uppercase;background:var(--ink);color:var(--paper);border:none;border-radius:999px;cursor:pointer;transition:all .3s var(--ease);margin-bottom:10px;}
+.lead-submit:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 8px 24px -10px rgba(42,37,31,.55);}
+.lead-submit:disabled{opacity:.45;cursor:not-allowed;}
+.lead-skip{width:100%;padding:12px;font-family:var(--sans);font-size:11px;letter-spacing:.16em;text-transform:uppercase;background:transparent;color:var(--ink-3);border:1px dashed var(--line);border-radius:999px;cursor:pointer;transition:all .25s var(--ease);}
+.lead-skip:hover{color:var(--ink);border-color:var(--ink-3);}
+.lead-close{position:absolute;top:12px;right:14px;background:rgba(234,226,214,.12);border:none;cursor:pointer;color:rgba(234,226,214,.6);padding:6px;border-radius:6px;display:inline-flex;transition:color .2s;z-index:2;}
+.lead-close:hover{color:var(--paper);}
+.lead-close svg{width:17px;height:17px;}
+.lead-err{font-family:var(--sans);font-size:11px;color:var(--st-descont);letter-spacing:.08em;margin:-6px 0 8px;text-align:center;}
+.lead-success-body{padding:40px 30px 36px;text-align:center;}
+.lead-success-icon{font-size:44px;margin-bottom:16px;}
+.lead-success-body h3{font-family:var(--display);font-size:28px;font-style:italic;font-weight:400;margin:0 0 10px;color:var(--ink);}
+.lead-success-body p{font-family:var(--serif);font-size:16px;color:var(--ink-2);line-height:1.65;margin:0 0 26px;}
+@media(max-width:600px){
+  .lead-box-discount{font-size:42px;}
+  .lead-box-hero{padding:26px 24px 22px;}
+  .lead-box-body{padding:22px 22px 26px;}
+}
 /* LIGHTBOX */
 .lightbox{position:fixed;inset:0;height:100vh;height:100dvh;z-index:400;background:rgba(20,16,12,.92);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;padding:clamp(20px,5vw,70px);animation:fadeIn .35s var(--ease);cursor:zoom-out;}
 .lightbox-inner{position:relative;max-width:min(1100px,92vw);max-height:88vh;max-height:88dvh;display:flex;flex-direction:column;align-items:center;gap:18px;cursor:default;animation:lbIn .5s var(--ease) both;}
@@ -796,12 +831,46 @@ const supa = supabase.createClient(SUPA_URL, SUPA_KEY);
     }
   }
 
+  /* ---- Guardar lead de captación y enviar WhatsApp de bienvenida ---- */
+  async function saveLead({ nombre, whatsapp, correo }) {
+    // 1. Guardar en Supabase tabla leads_catalogo
+    const { error } = await supa.from("leads_catalogo").insert({
+      nombre: nombre.trim(),
+      whatsapp: whatsapp.trim().replace(/\D/g, ""),
+      correo: correo.trim().toLowerCase(),
+      origen: "catalogo_web",
+      created_at: new Date().toISOString(),
+    });
+    if (error) { console.error("Error guardando lead:", error); throw error; }
+
+    // 2. Enviar WhatsApp de bienvenida via WAHA (proxy Vercel o directo)
+    const numero = whatsapp.trim().replace(/\D/g, "");
+    const numConCodigo = numero.startsWith("57") ? numero : "57" + numero;
+    const mensaje = `¡Hola ${nombre.trim()}! 👋 Gracias por registrarte en el catálogo de *Casa DAMS*.\n\nTe avisaremos sobre nuestras ofertas, descuentos y novedades en muebles. 🛋️\n\n¿Hay algún mueble que te haya llamado la atención? Con gusto te asesoramos. 😊`;
+
+    try {
+      // Intentar via proxy Vercel (mismo dominio, evita CORS)
+      await fetch("/api/waha", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chatId: numConCodigo + "@c.us",
+          text: mensaje,
+          session: "default",
+        }),
+      });
+    } catch (e) {
+      console.warn("WhatsApp de bienvenida no enviado (WAHA no disponible):", e);
+      // No lanzar error — el lead ya quedó guardado en Supabase
+    }
+  }
+
   window.CASA = {
     CATEGORIES, STATUS, FINISH_PALETTE, DIM_SUGGEST,
     load, saveItem, deleteItem, toggleHidden, uploadPhoto, uid, blank,
     loadSettings, saveSettings, uploadCoverImage, uploadProductVideo,
     uploadGalleryPhoto, deleteGalleryPhoto,
-    registerView, loadStats,
+    registerView, loadStats, saveLead,
     adminHash: ADMIN_HASH_VAL,
     logoUrl: LOGO_URL,
     getAdminToken,
@@ -1881,6 +1950,96 @@ const Stats = ({ onBack }) => {
 Object.assign(window, { SelectionBar, ClientView, Stats });
 </script>
 
+<!-- LeadModal — Captación de contactos para promociones -->
+<script type="text/babel" data-presets="react-classic">
+function LeadModal({ onClose }) {
+  const [nombre, setNombre]   = React.useState("");
+  const [correo, setCorreo]   = React.useState("");
+  const [acepta, setAcepta]   = React.useState(false);
+  const [sending, setSending] = React.useState(false);
+  const [done, setDone]       = React.useState(false);
+  const [err, setErr]         = React.useState("");
+
+  const valid = nombre.trim().length > 1
+    && correo.includes("@")
+    && acepta;
+
+  async function handleSubmit() {
+    if (!valid || sending) return;
+    setSending(true);
+    setErr("");
+    try {
+      await window.CASA.saveLead({ nombre, whatsapp: "", correo });
+      setDone(true);
+    } catch(e) {
+      setErr("Hubo un error. Intenta de nuevo.");
+    } finally {
+      setSending(false);
+    }
+  }
+
+  return (
+    <div className="lead-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="lead-box">
+        {done ? (
+          <div className="lead-success-body">
+            <div className="lead-success-icon">🛋️</div>
+            <h3>¡Ya estás dentro!</h3>
+            <p>Recibirás nuestras mejores ofertas y novedades en tu correo. Gracias por tu interés en Casa DAMS.</p>
+            <button className="lead-submit" onClick={onClose}>Explorar el catálogo</button>
+          </div>
+        ) : (
+          <>
+            <div className="lead-box-hero">
+              <button className="lead-close" onClick={onClose}><Icon name="x" /></button>
+              <p className="kicker">Oferta exclusiva</p>
+              <div className="lead-box-discount">Primero<br/><em>en saberlo</em></div>
+              <p className="lead-box-subtitle">Novedades · Descuentos · Lanzamientos</p>
+            </div>
+            <div className="lead-box-body">
+              <p className="lead-box-desc">Regístrate y sé el primero en conocer nuestras promociones y nuevas colecciones.</p>
+              <div className="lead-fields">
+                <div className="lead-field">
+                  <input
+                    type="text"
+                    placeholder="Nombre completo"
+                    value={nombre}
+                    onChange={e => setNombre(e.target.value)}
+                  />
+                </div>
+                <div className="lead-field">
+                  <input
+                    type="email"
+                    placeholder="Correo electrónico"
+                    value={correo}
+                    onChange={e => setCorreo(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="lead-privacy">
+                <input
+                  type="checkbox"
+                  id="lead-acepta"
+                  checked={acepta}
+                  onChange={e => setAcepta(e.target.checked)}
+                />
+                <span>Acepto recibir comunicaciones de Casa DAMS. Puedo cancelar cuando quiera. (Ley 1581 de 2012)</span>
+              </div>
+              {err && <div className="lead-err">{err}</div>}
+              <button className="lead-submit" disabled={!valid || sending} onClick={handleSubmit}>
+                {sending ? "Enviando…" : "¡Quiero estar al día!"}
+              </button>
+              <button className="lead-skip" onClick={onClose}>No me interesa, gracias.</button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+Object.assign(window, { LeadModal });
+</script>
+
 <!-- App root -->
 <script type="text/babel" data-presets="react-classic">
 const { useState, useEffect, useCallback } = React;
@@ -1894,6 +2053,17 @@ function App() {
   const [detailReturn, setDetailReturn] = useState("catalog");
   const [admin, setAdmin] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
+  const [showLead, setShowLead] = useState(false);
+
+  // Auto-popup de captación — aparece a los 8s si no lo ha visto antes
+  React.useEffect(() => {
+    if (localStorage.getItem("cd_lead_shown")) return;
+    const t = setTimeout(() => {
+      setShowLead(true);
+      localStorage.setItem("cd_lead_shown", "1");
+    }, 8000);
+    return () => clearTimeout(t);
+  }, []);
   const logoTaps = React.useRef({ count: 0, timer: null });
   const [filter, setFilter] = useState("Todo");
   const [query, setQuery] = useState("");
@@ -2165,6 +2335,7 @@ function App() {
           <WAIcon />
         </a>
       )}
+      {showLead && <LeadModal onClose={() => setShowLead(false)} />}
       {toast && <div className="toast"><Icon name="check" style={{ width: 15, height: 15 }} />{toast}</div>}
       {showAuth && (
         <AdminAuth
