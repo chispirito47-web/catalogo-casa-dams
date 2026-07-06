@@ -178,6 +178,14 @@ body{background:var(--paper);color:var(--ink);font-family:var(--sans);-webkit-fo
   .lead-box-hero{padding:26px 24px 22px;}
   .lead-box-body{padding:22px 22px 26px;}
 }
+/* PESTAÑA FIJA DE OFERTAS */
+.lead-tab{position:fixed;right:0;top:50%;transform:translateY(-50%);z-index:119;background:var(--ink);color:var(--paper);border:none;cursor:pointer;padding:14px 10px;border-radius:8px 0 0 8px;display:flex;align-items:center;justify-content:center;box-shadow:-4px 0 18px rgba(42,37,31,.25);transition:background .25s var(--ease),transform .25s var(--ease);writing-mode:vertical-rl;text-orientation:mixed;}
+.lead-tab:hover{background:var(--wood);transform:translateY(-50%) translateX(-2px);}
+.lead-tab-txt{font-family:var(--sans);font-size:11px;letter-spacing:.26em;text-transform:uppercase;color:var(--paper);}
+@media(max-width:600px){
+  .lead-tab{padding:12px 8px;top:60%;}
+  .lead-tab-txt{font-size:10px;letter-spacing:.2em;}
+}
 /* LIGHTBOX */
 .lightbox{position:fixed;inset:0;height:100vh;height:100dvh;z-index:400;background:rgba(20,16,12,.92);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;padding:clamp(20px,5vw,70px);animation:fadeIn .35s var(--ease);cursor:zoom-out;}
 .lightbox-inner{position:relative;max-width:min(1100px,92vw);max-height:88vh;max-height:88dvh;display:flex;flex-direction:column;align-items:center;gap:18px;cursor:default;animation:lbIn .5s var(--ease) both;}
@@ -2055,12 +2063,14 @@ function App() {
   const [showAuth, setShowAuth] = useState(false);
   const [showLead, setShowLead] = useState(false);
 
-  // Auto-popup de captación — aparece a los 8s si no lo ha visto antes
+  // Auto-popup de captación — aparece a los 8s si no lo ha visto en los últimos 7 días
   React.useEffect(() => {
-    if (localStorage.getItem("cd_lead_shown")) return;
+    const last = localStorage.getItem("cd_lead_shown");
+    const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000;
+    if (last && Date.now() - parseInt(last) < SEVEN_DAYS) return;
     const t = setTimeout(() => {
       setShowLead(true);
-      localStorage.setItem("cd_lead_shown", "1");
+      localStorage.setItem("cd_lead_shown", Date.now().toString());
     }, 8000);
     return () => clearTimeout(t);
   }, []);
@@ -2336,6 +2346,11 @@ function App() {
         </a>
       )}
       {showLead && <LeadModal onClose={() => setShowLead(false)} />}
+      {((view === "catalog" && !selecting) || view === "detail") && !showLead && (
+        <button className="lead-tab" onClick={() => setShowLead(true)} aria-label="Ver ofertas">
+          <span className="lead-tab-txt">Ofertas</span>
+        </button>
+      )}}
       {toast && <div className="toast"><Icon name="check" style={{ width: 15, height: 15 }} />{toast}</div>}
       {showAuth && (
         <AdminAuth
