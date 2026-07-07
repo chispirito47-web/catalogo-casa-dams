@@ -69,8 +69,10 @@ body{background:var(--paper);color:var(--ink);font-family:var(--sans);-webkit-fo
 .auth-close svg{width:18px;height:18px;}
 .ph{position:relative;overflow:hidden;background-color:var(--card-soft);background-image:repeating-linear-gradient(-45deg,rgba(138,110,84,.06) 0 12px,rgba(138,110,84,.0) 12px 24px);display:flex;align-items:center;justify-content:center;}
 .ph::after{content:attr(data-label);font-family:var(--sans);font-size:10px;letter-spacing:.24em;text-transform:uppercase;color:var(--ink-3);padding:6px 12px;border:1px solid var(--line);border-radius:999px;background:color-mix(in srgb,var(--card) 70%,transparent);}
-.ph img{width:100%;height:100%;object-fit:cover;display:block;}
+.ph img{width:100%;height:100%;object-fit:cover;display:block;position:absolute;inset:0;}
 .ph.has-img::after{display:none;}
+.img-blur-ph{position:absolute;inset:0;background:linear-gradient(135deg,var(--card-soft) 25%,var(--paper-2) 50%,var(--card-soft) 75%);background-size:200% 200%;animation:shimmer 1.6s ease-in-out infinite;}
+@keyframes shimmer{0%{background-position:200% 0;}100%{background-position:-200% 0;}}
 .btn{font-family:var(--sans);cursor:pointer;text-transform:uppercase;letter-spacing:.2em;font-size:12px;padding:14px 28px;border-radius:999px;border:1px solid var(--ink);background:var(--ink);color:var(--paper);transition:all .3s var(--ease);display:inline-flex;align-items:center;gap:10px;}
 .btn:hover{transform:translateY(-2px);box-shadow:var(--shadow-card);}
 .btn.ghost{background:transparent;color:var(--ink);}
@@ -913,11 +915,38 @@ const Icon = ({ name, ...p }) => {
   );
 };
 
-const Img = ({ src, label = "Foto del mueble", className = "" }) => (
-  <div className={"ph " + (src ? "has-img " : "") + className} data-label={label}>
-    {src ? <img src={src} alt={label} /> : null}
-  </div>
-);
+/* Convierte URL de Supabase Storage al endpoint de transformación optimizada */
+function optimizeImgUrl(src, width = 800) {
+  if (!src) return null;
+  // Solo optimizar URLs del bucket de Supabase Storage
+  const BUCKET_MARKER = "/storage/v1/object/public/";
+  const idx = src.indexOf(BUCKET_MARKER);
+  if (idx === -1) return src; // URL externa, no tocar
+  const bucketAndPath = src.slice(idx + BUCKET_MARKER.length).split("?")[0];
+  return `https://pqpzhmopnigxyacwdjbc.supabase.co/storage/v1/render/image/public/${bucketAndPath}?width=${width}&quality=78&format=webp`;
+}
+
+const Img = ({ src, label = "Foto del mueble", className = "", width = 800 }) => {
+  const [loaded, setLoaded] = React.useState(false);
+  const optimized = optimizeImgUrl(src, width);
+  return (
+    <div className={"ph " + (src ? "has-img " : "") + className} data-label={label}>
+      {src ? (
+        <>
+          {!loaded && <div className="img-blur-ph" />}
+          <img
+            src={optimized}
+            alt={label}
+            loading="lazy"
+            decoding="async"
+            onLoad={() => setLoaded(true)}
+            style={{ opacity: loaded ? 1 : 0, transition: "opacity .35s ease" }}
+          />
+        </>
+      ) : null}
+    </div>
+  );
+};
 
 const StatusBadge = ({ status }) => {
   const s = window.CASA.STATUS[status] || window.CASA.STATUS.almacen;
@@ -1275,7 +1304,7 @@ const Lightbox = ({ images, index, label, onClose, onNav }) => {
       <div className="lightbox-inner" onClick={(e) => e.stopPropagation()} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
         <button className="lightbox-close" onClick={onClose} title="Cerrar"><Icon name="x" /></button>
         {multi && <button className="lightbox-nav prev" onClick={() => onNav(-1)}><Icon name="arrowL" /></button>}
-        <img className="lightbox-img" src={images[index]} alt={label} />
+        <img className="lightbox-img" src={optimizeImgUrl(images[index], 1600)} alt={label} />
         {multi && <button className="lightbox-nav next" onClick={() => onNav(1)}><Icon name="arrowR" /></button>}
         {label && <div className="lightbox-cap">{label}</div>}
       </div>
