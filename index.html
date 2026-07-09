@@ -840,11 +840,13 @@ const supa = supabase.createClient(SUPA_URL, SUPA_KEY);
   }
 
   /* ---- Guardar lead de captación y enviar a Brevo ---- */
-  async function saveLead({ nombre, whatsapp, correo }) {
+  async function saveLead({ nombre, whatsapp, correo, aceptaWhatsapp }) {
+    const wa = whatsapp.trim().replace(/\D/g, ""); // solo dígitos
     // 1. Guardar en Supabase tabla leads_catalogo
     const { error } = await supa.from("leads_catalogo").insert({
       nombre: nombre.trim(),
-      whatsapp: "",
+      whatsapp: wa,
+      acepta_whatsapp: !!aceptaWhatsapp,
       correo: correo.trim().toLowerCase(),
       origen: "catalogo_web",
       created_at: new Date().toISOString(),
@@ -858,7 +860,7 @@ const supa = supabase.createClient(SUPA_URL, SUPA_KEY);
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email: correo.trim().toLowerCase(),
-          attributes: { NOMBRE: nombre.trim() },
+          attributes: { NOMBRE: nombre.trim(), WHATSAPP: wa, ACEPTA_WA: !!aceptaWhatsapp },
           listIds: [2],
           updateEnabled: true,
         }),
@@ -1956,12 +1958,14 @@ Object.assign(window, { SelectionBar, ClientView, Stats });
 <!-- LeadModal — Captación de contactos para promociones -->
 <script type="text/babel" data-presets="react-classic">
 function LeadModal({ onClose }) {
-  const [nombre, setNombre]   = React.useState("");
-  const [correo, setCorreo]   = React.useState("");
-  const [acepta, setAcepta]   = React.useState(false);
-  const [sending, setSending] = React.useState(false);
-  const [done, setDone]       = React.useState(false);
-  const [err, setErr]         = React.useState("");
+  const [nombre, setNombre]     = React.useState("");
+  const [whatsapp, setWhatsapp] = React.useState("");
+  const [correo, setCorreo]     = React.useState("");
+  const [acepta, setAcepta]     = React.useState(false);
+  const [aceptaWa, setAceptaWa] = React.useState(false);
+  const [sending, setSending]   = React.useState(false);
+  const [done, setDone]         = React.useState(false);
+  const [err, setErr]           = React.useState("");
 
   const valid = nombre.trim().length > 1
     && correo.includes("@")
@@ -1972,7 +1976,7 @@ function LeadModal({ onClose }) {
     setSending(true);
     setErr("");
     try {
-      await window.CASA.saveLead({ nombre, whatsapp: "", correo });
+      await window.CASA.saveLead({ nombre, whatsapp, correo, aceptaWhatsapp: aceptaWa });
       setDone(true);
     } catch(e) {
       setErr("Hubo un error. Intenta de nuevo.");
@@ -2012,6 +2016,14 @@ function LeadModal({ onClose }) {
                 </div>
                 <div className="lead-field">
                   <input
+                    type="tel"
+                    placeholder="Tu WhatsApp (ej: 3215400000)"
+                    value={whatsapp}
+                    onChange={e => setWhatsapp(e.target.value)}
+                  />
+                </div>
+                <div className="lead-field">
+                  <input
                     type="email"
                     placeholder="Correo electrónico"
                     value={correo}
@@ -2026,7 +2038,16 @@ function LeadModal({ onClose }) {
                   checked={acepta}
                   onChange={e => setAcepta(e.target.checked)}
                 />
-                <span>Acepto recibir comunicaciones de Casa DAMS. Puedo cancelar cuando quiera. (Ley 1581 de 2012)</span>
+                <span>Acepto recibir promociones de Casa DAMS por correo. Puedo cancelar cuando quiera. (Ley 1581 de 2012)</span>
+              </div>
+              <div className="lead-privacy">
+                <input
+                  type="checkbox"
+                  id="lead-acepta-wa"
+                  checked={aceptaWa}
+                  onChange={e => setAceptaWa(e.target.checked)}
+                />
+                <span>Deseo recibir promociones también por WhatsApp.</span>
               </div>
               {err && <div className="lead-err">{err}</div>}
               <button className="lead-submit" disabled={!valid || sending} onClick={handleSubmit}>
