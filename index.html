@@ -870,12 +870,66 @@ const supa = supabase.createClient(SUPA_URL, SUPA_KEY);
     }
   }
 
+  /* ---- Cargar fotos de portada de categorías (__cat_Nombrecat__) ---- */
+  async function loadCatPhotos() {
+    const ids = CATEGORIES.map((c) => `__cat_${c}__`);
+    const { data, error } = await supa
+      .from("catalogo_productos")
+      .select("id, photo_url")
+      .in("id", ids);
+    if (error || !data) return {};
+    const map = {};
+    data.forEach((r) => {
+      const cat = r.id.replace("__cat_", "").replace("__", "");
+      if (r.photo_url) map[cat] = r.photo_url;
+    });
+    return map;
+  }
+
+  /* ---- Guardar foto de portada de una categoría ---- */
+  async function saveCatPhoto(cat, photoUrl) {
+    const id = `__cat_${cat}__`;
+    await callAdmin("saveItem", {
+      id,
+      name: `__portada_${cat}`,
+      category: cat,
+      ref: "",
+      price: "",
+      status: "almacen",
+      description: "",
+      structure: "",
+      finishes: [],
+      dimensions: [],
+      photo_url: photoUrl,
+      gallery: [],
+      hidden: false,
+      video_url: null,
+    });
+  }
+
+  /* ---- Upload de foto de portada de categoría ---- */
+  async function uploadCatPhoto(file, cat) {
+    const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+    const path = `_cat-covers/${cat.toLowerCase()}.${ext}`;
+    // Borrar versiones previas
+    await Promise.allSettled(["jpg","jpeg","png","webp"].map((e) =>
+      supa.storage.from("catalogo-fotos").remove([`_cat-covers/${cat.toLowerCase()}.${e}`])
+    ));
+    const { error } = await supa.storage.from("catalogo-fotos").upload(path, file, {
+      upsert: true, contentType: file.type || "image/jpeg",
+    });
+    if (error) { console.error("Error subiendo foto de categoría:", error); return null; }
+    const { data } = supa.storage.from("catalogo-fotos").getPublicUrl(path);
+    return data.publicUrl + "?t=" + Date.now();
+  }
+
   window.CASA = {
     CATEGORIES, STATUS, FINISH_PALETTE, DIM_SUGGEST,
     load, saveItem, deleteItem, toggleHidden, uploadPhoto, uid, blank,
     loadSettings, saveSettings, uploadCoverImage, uploadProductVideo,
     uploadGalleryPhoto, deleteGalleryPhoto,
     registerView, loadStats, saveLead,
+    loadCatPhotos, saveCatPhoto, uploadCatPhoto,
     adminHash: ADMIN_HASH_VAL,
     logoUrl: LOGO_URL,
     getAdminToken,
@@ -1111,31 +1165,68 @@ const CAT_DESCS = {
   Mesas: "Centro de living, comedor y terraza",
 };
 
-const CategoryGrid = ({ items, filter, setFilter }) => {
+const CategoryGrid = ({ items, filter, setFilter, admin, catPhotos, setCatPhotos }) => {
   const CATS = window.CASA.CATEGORIES;
   const gridRef = React.useRef(null);
+  const [uploading, setUploading] = React.useState(null); // cat name being uploaded
+  const fileInputRef = React.useRef(null);
+  const [pendingCat, setPendingCat] = React.useState(null);
 
-  /* Para cada categoría buscamos la primera foto disponible */
+  /* Foto de portada: primero la foto personalizada de la cat, si no la primera del catálogo */
   const catPhoto = (cat) => {
+    if (catPhotos && catPhotos[cat]) return catPhotos[cat];
     const found = items.find((it) => (it.category === cat) && (it.photo || it.photo_url) && !it.hidden);
     return found ? (found.photo_url || found.photo) : null;
   };
 
   const handleCat = (cat) => {
     setFilter(cat === filter ? "Todo" : cat);
-    /* Scroll suave hacia el grid de productos */
     setTimeout(() => {
       const grid = document.querySelector(".grid");
       if (grid) grid.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 60);
   };
 
+  const handlePhotoBtn = (e, cat) => {
+    e.stopPropagation();
+    setPendingCat(cat);
+    fileInputRef.current.value = "";
+    fileInputRef.current.click();
+  };
+
+  const handleFileChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file || !pendingCat) return;
+    setUploading(pendingCat);
+    try {
+      const url = await CASA.uploadCatPhoto(file, pendingCat);
+      if (url) {
+        await CASA.saveCatPhoto(pendingCat, url);
+        setCatPhotos((prev) => ({ ...prev, [pendingCat]: url }));
+      }
+    } catch (err) {
+      console.error("Error al cambiar foto de categoría:", err);
+    }
+    setUploading(null);
+    setPendingCat(null);
+  };
+
   return (
     <div className="cat-section">
+      {/* Input oculto para subir foto */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        style={{ display: "none" }}
+        onChange={handleFileChange}
+      />
       <div className="cat-grid" ref={gridRef}>
         {CATS.map((cat, i) => {
           const photo = catPhoto(cat);
           const isActive = filter === cat;
+          const isUploading = uploading === cat;
+          const hasCustomPhoto = catPhotos && catPhotos[cat];
           return (
             <div
               key={cat}
@@ -1154,6 +1245,38 @@ const CategoryGrid = ({ items, filter, setFilter }) => {
                   {isActive ? "Viendo esta categoría" : "Ver categoría"} →
                 </button>
               </div>
+              {/* Botón de editar foto — solo visible en modo admin */}
+              {admin && (
+                <button
+                  className="cat-photo-edit-btn"
+                  title={hasCustomPhoto ? "Cambiar foto de portada" : "Subir foto de portada"}
+                  onClick={(e) => handlePhotoBtn(e, cat)}
+                  disabled={isUploading}
+                  style={{
+                    position: "absolute",
+                    top: 10,
+                    right: 10,
+                    zIndex: 10,
+                    background: isUploading ? "rgba(0,0,0,0.5)" : "rgba(255,255,255,0.92)",
+                    border: "none",
+                    borderRadius: "50%",
+                    width: 36,
+                    height: 36,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    cursor: isUploading ? "wait" : "pointer",
+                    boxShadow: "0 2px 8px rgba(0,0,0,0.18)",
+                    color: isUploading ? "#fff" : "var(--wood)",
+                    transition: "all .2s",
+                  }}
+                >
+                  {isUploading
+                    ? <Icon name="spinner" width={18} height={18} style={{ animation: "spin 1s linear infinite" }} />
+                    : <Icon name="image" width={18} height={18} />
+                  }
+                </button>
+              )}
             </div>
           );
         })}
@@ -1162,7 +1285,7 @@ const CategoryGrid = ({ items, filter, setFilter }) => {
   );
 };
 
-const Catalog = ({ items, admin, selecting, selected, onToggleSelect, filter, setFilter, query, setQuery, onOpen, onAdd, onEdit, onToggleHide, onDelete }) => {
+const Catalog = ({ items, admin, selecting, selected, onToggleSelect, filter, setFilter, query, setQuery, onOpen, onAdd, onEdit, onToggleHide, onDelete, catPhotos, setCatPhotos }) => {
   const CATS = window.CASA.CATEGORIES;
   const selSet = new Set(selected || []);
   const visible = items
@@ -1178,7 +1301,7 @@ const Catalog = ({ items, admin, selecting, selected, onToggleSelect, filter, se
     <div className="catalog view-enter" style={{ padding: 0, maxWidth: "none" }}>
       {/* Grid de categorías — solo visible cuando no se está en modo selección */}
       {!selecting && (
-        <CategoryGrid items={items} filter={filter} setFilter={setFilter} />
+        <CategoryGrid items={items} filter={filter} setFilter={setFilter} admin={admin} catPhotos={catPhotos || {}} setCatPhotos={setCatPhotos} />
       )}
       <div style={{ maxWidth: 1600, margin: "0 auto", padding: "clamp(24px,4vh,48px) clamp(12px,2vw,32px)" }}>
         <div className="catalog-head">
@@ -2101,6 +2224,7 @@ function App() {
   const [clientOwner, setClientOwner] = useState(true);
   const [cover, setCover] = useState({ imageUrl: null });
   const [coverUploading, setCoverUploading] = useState(false);
+  const [catPhotos, setCatPhotos] = useState({});
   const DEFAULT_NOTE = "Estas son las piezas que elegimos para tu espacio. Toca cualquiera para ver medidas, acabados y todos los detalles.";
   const [clientNote, setClientNote] = useState(DEFAULT_NOTE);
 
@@ -2114,6 +2238,7 @@ function App() {
         setLoading(false);
       });
     CASA.loadSettings().then((s) => setCover(s)).catch(() => {});
+    CASA.loadCatPhotos().then((p) => setCatPhotos(p)).catch(() => {});
   }, []);
 
   /* Reportar cada cambio de sección a Google Analytics, ya que el catálogo es una sola página */
@@ -2319,7 +2444,8 @@ function App() {
           <Catalog items={items} admin={admin} selecting={selecting} selected={selected}
             onToggleSelect={toggleSelect} filter={filter} setFilter={setFilter}
             query={query} setQuery={setQuery} onOpen={openProduct}
-            onAdd={openAdd} onEdit={openEdit} onToggleHide={toggleHide} onDelete={askDelete} />
+            onAdd={openAdd} onEdit={openEdit} onToggleHide={toggleHide} onDelete={askDelete}
+            catPhotos={catPhotos} setCatPhotos={setCatPhotos} />
           {!selecting && <footer className="foot"><div className="mark">Casa DAMS</div><div className="web">Mobiliario · Diseño contemporáneo</div></footer>}
         </>
       )}
