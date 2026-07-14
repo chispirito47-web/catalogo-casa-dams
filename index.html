@@ -1102,7 +1102,7 @@ const ProductCard = ({ item, index, admin, selecting, isSelected, onToggleSelect
         <span className="card-cat">{item.category}</span>
         <h3 className="card-name">{item.name || "Sin nombre"}</h3>
         <div className="card-meta">
-          <span className="card-dim">{firstDim ? firstDim.value : "—"}</span>
+          <span className="card-dim">{item.category === "Comedores" && firstDim ? (firstDim.label ? firstDim.label + ": " + firstDim.value : firstDim.value) : ""}</span>
           <span className="card-price">{item.price || ""}</span>
         </div>
       </div>
