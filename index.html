@@ -722,11 +722,10 @@ const supa = supabase.createClient(SUPA_URL, SUPA_KEY);
     };
   }
 
-  /* ── Admin hash: SHA-256 de la contraseña. Para cambiarla:
-        1. Calcula SHA-256 de tu nueva clave (ej: en https://emn178.github.io/online-tools/sha256.html)
-        2. Reemplaza el valor de adminHash abajo
-        3. Redespliega en Vercel ─────────────────────────────── */
-  const ADMIN_HASH_VAL = "429357936b5429f7c3e517aaff40d13fe8618d95d88f623a21f6f7a446325280";
+  /* ── Admin hash: la verificación de contraseña vive SOLO en la Edge Function.
+        Para cambiar la clave, actualiza la variable de entorno ADMIN_HASH en Supabase Edge Functions.
+        No hay hash en el frontend — la contraseña viaja por HTTPS a la Edge que la verifica. ── */
+  const ADMIN_HASH_VAL = null; // no se usa en el frontend
   /* Logo de Casa DAMS — URL pública de Supabase Storage (opcional, deja null si no tienes) */
   const LOGO_URL = null;
 
@@ -930,7 +929,6 @@ const supa = supabase.createClient(SUPA_URL, SUPA_KEY);
     uploadGalleryPhoto, deleteGalleryPhoto,
     registerView, loadStats, saveLead,
     loadCatPhotos, saveCatPhoto, uploadCatPhoto,
-    adminHash: ADMIN_HASH_VAL,
     logoUrl: LOGO_URL,
     getAdminToken,
     SEED, mapRow,
@@ -969,9 +967,9 @@ const Icon = ({ name, ...p }) => {
   );
 };
 
-const Img = ({ src, label = "Foto del mueble", className = "" }) => (
+const Img = ({ src, label = "Foto del mueble", className = "", eager = false }) => (
   <div className={"ph " + (src ? "has-img " : "") + className} data-label={label}>
-    {src ? <img src={src} alt={label} /> : null}
+    {src ? <img src={src} alt={label} loading={eager ? "eager" : "lazy"} decoding="async" /> : null}
   </div>
 );
 
@@ -1234,7 +1232,7 @@ const CategoryGrid = ({ items, filter, setFilter, admin, catPhotos, setCatPhotos
               onClick={() => handleCat(cat)}
             >
               {photo
-                ? <img className="cat-img" src={photo} alt={cat} />
+                ? <img className="cat-img" src={photo} alt={cat} loading="lazy" decoding="async" />
                 : <div className="cat-ph" style={{ color: "var(--ink-2)" }}>{CAT_ICONS[cat]}</div>
               }
               <div className="cat-overlay" />
@@ -1445,7 +1443,7 @@ const Detail = ({ item, related, onBack, onOpen, onShare }) => {
                 />
               ) : (
                 <>
-                  <Img key={activeImg} src={gallery[activeImg]} label={item.category + " · " + (views[activeImg] || "Vista")} />
+                  <Img key={activeImg} src={gallery[activeImg]} label={item.category + " · " + (views[activeImg] || "Vista")} eager />
                   {canZoom && <span className="zoom-hint"><Icon name="zoom" /></span>}
                 </>
               )}
@@ -1602,27 +1600,32 @@ Object.assign(window, { Cover });
 <!-- Modal de autenticación admin -->
 <script type="text/babel" data-presets="react-classic">
 /* SHA-256 simple hash para verificar la contraseña sin exponerla en texto plano */
-const _hashPwd = async (s) => {
-  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
-  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,"0")).join("");
-};
-const ADMIN_HASH = window.CASA.adminHash;
-
 const AdminAuth = ({ onSuccess, onClose }) => {
   const [pwd, setPwd] = React.useState("");
   const [show, setShow] = React.useState(false);
   const [err, setErr] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
 
+  /* La verificación vive SOLO en la Edge Function — ningún hash queda expuesto en el frontend.
+     Se manda la contraseña por HTTPS; la Edge la hashea y compara contra su variable de entorno. */
   const attempt = async () => {
+    if (!pwd.trim()) return;
     setBusy(true); setErr(false);
-    const h = await _hashPwd(pwd);
-    if (h === ADMIN_HASH) {
-      sessionStorage.setItem("cd_admin_ok", "1");
-      // Guardar la contraseña como token para las llamadas a la Edge Function
-      sessionStorage.setItem("cd_admin_token", pwd);
-      onSuccess();
-    } else {
+    try {
+      const EDGE_URL = "https://pqpzhmopnigxyacwdjbc.supabase.co/functions/v1/catalogo-admin";
+      const res = await fetch(EDGE_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-admin-token": pwd },
+        body: JSON.stringify({ action: "verifyAdmin", payload: {} }),
+      });
+      if (res.ok) {
+        sessionStorage.setItem("cd_admin_ok", "1");
+        sessionStorage.setItem("cd_admin_token", pwd);
+        onSuccess();
+      } else {
+        setErr(true); setPwd("");
+      }
+    } catch (e) {
       setErr(true); setPwd("");
     }
     setBusy(false);
@@ -2161,7 +2164,7 @@ function LeadModal({ onClose }) {
                   checked={acepta}
                   onChange={e => setAcepta(e.target.checked)}
                 />
-                <span>Acepto recibir promociones de Casa DAMS por correo. Puedo cancelar cuando quiera. (Ley 1581 de 2012)</span>
+                <span>Autorizo a Casa DAMS a tratar mis datos personales (nombre y correo) para enviarme promociones y novedades. Puedo revocar esta autorización en cualquier momento escribiendo a nuestro WhatsApp. (Ley 1581 de 2012 — Política de tratamiento de datos)</span>
               </div>
               <div className="lead-privacy">
                 <input
@@ -2170,7 +2173,7 @@ function LeadModal({ onClose }) {
                   checked={aceptaWa}
                   onChange={e => setAceptaWa(e.target.checked)}
                 />
-                <span>Deseo recibir promociones también por WhatsApp.</span>
+                <span>Autorizo también el envío de mensajes promocionales por WhatsApp al número que indiqué.</span>
               </div>
               {err && <div className="lead-err">{err}</div>}
               <button className="lead-submit" disabled={!valid || sending} onClick={handleSubmit}>
