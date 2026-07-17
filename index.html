@@ -68,6 +68,11 @@ body{background:var(--paper);color:var(--ink);font-family:var(--sans);-webkit-fo
 .auth-close:hover{color:var(--ink);}
 .auth-close svg{width:18px;height:18px;}
 .ph{position:relative;overflow:hidden;background-color:var(--card-soft);background-image:repeating-linear-gradient(-45deg,rgba(138,110,84,.06) 0 12px,rgba(138,110,84,.0) 12px 24px);display:flex;align-items:center;justify-content:center;}
+.ph::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent 0%,rgba(255,255,255,.18) 50%,transparent 100%);background-size:200% 100%;animation:shimmer 1.6s infinite;pointer-events:none;}
+.ph.has-img::after{display:none;}
+.ph img{transition:opacity .4s ease;opacity:0;}
+.ph.loaded img,.ph img.loaded{opacity:1;}
+@keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
 .ph::after{content:attr(data-label);font-family:var(--sans);font-size:10px;letter-spacing:.24em;text-transform:uppercase;color:var(--ink-3);padding:6px 12px;border:1px solid var(--line);border-radius:999px;background:color-mix(in srgb,var(--card) 70%,transparent);}
 .ph img{width:100%;height:100%;object-fit:cover;display:block;}
 .ph.has-img::after{display:none;}
@@ -466,48 +471,74 @@ body{background:var(--paper);color:var(--ink);font-family:var(--sans);-webkit-fo
     .cover-cta .btn{ width:100%; justify-content:center; padding:16px 24px; }
     .barcode{ display:none; }
 
-    /* ---- Encabezado del catálogo ---- */
-    .catalog-head{ margin-bottom:22px; }
+    /* ---- Catálogo: padding cómodo ---- */
+    .catalog{ padding:0 0 100px; }
+    .catalog-head{ margin:20px 14px 18px; }
+    .catalog-head h1{ font-size:34px; }
 
     /* ---- Barra de filtros: chips deslizables + buscador ancho ---- */
-    .toolbar{ flex-direction:column; align-items:stretch; gap:14px; margin-bottom:24px; }
+    .toolbar{ flex-direction:column; align-items:stretch; gap:10px; margin:0 14px 20px; }
     .chips{
       flex-wrap:nowrap; overflow-x:auto; gap:8px;
       padding-bottom:4px; margin:0 -14px; padding-left:14px; padding-right:14px;
       scrollbar-width:none; -webkit-overflow-scrolling:touch;
+      touch-action:pan-x; scroll-snap-type:x mandatory;
     }
     .chips::-webkit-scrollbar{ display:none; }
-    .chip{ flex:0 0 auto; padding:11px 18px; }
+    .chip{ scroll-snap-align:start; flex:0 0 auto; padding:12px 20px; min-height:44px; }
     .search{ width:100%; min-width:0; padding:13px 16px; }
 
-    /* ---- Grilla de productos: 2 columnas con respiro ---- */
+    /* ---- Grid de productos ---- */
     .grid{ grid-template-columns:repeat(2,1fr); gap:3px; }
-    .card-body{ padding:13px 7px 20px; }
+    .card-body{ padding:13px 10px 20px; }
     .card-cat{ font-size:10.5px; letter-spacing:.2em; }
-    .card-name{ font-size:19px; margin:5px 0 8px; min-height:calc(1.22em * 2); }
+    .card-name{ font-size:18px; margin:5px 0 8px; min-height:calc(1.22em * 2); }
     .card-dim{ font-size:12px; }
     .card-price{ font-size:15px; }
 
-    /* ---- Grilla de categorías ---- */
-    .cat-grid{ grid-template-columns:repeat(2,1fr); grid-auto-rows:208px; grid-template-rows:none; gap:3px; }
+    /* ---- Grilla de categorías: scroll horizontal en móvil ---- */
+    .cat-section{ margin:0 -14px 2px; }
+    .cat-grid{ display:flex; flex-direction:row; overflow-x:auto; gap:3px; grid-template-columns:none; grid-template-rows:none; scroll-snap-type:x mandatory; -webkit-overflow-scrolling:touch; scrollbar-width:none; padding:0 14px; }
+    .cat-grid::-webkit-scrollbar{ display:none; }
+    .cat-card{ flex:0 0 72vw; max-width:280px; height:220px; scroll-snap-align:start; grid-column:auto !important; }
     .cat-card:nth-child(4){ grid-column:auto; }
-    .cat-card:nth-child(5){ grid-column:1 / -1; }
+    .cat-card:nth-child(5){ grid-column:auto; }
     .cat-name{ font-size:24px; }
     .cat-desc{ font-size:12.5px; }
     .cat-btn{ padding:10px 16px; }
 
     /* ---- Detalle de pieza ---- */
-    .detail{ padding:20px 16px 70px; }
-    .detail-back{ padding-bottom:22px; }
-    .detail-card{ border-radius:16px; }
-    .detail-gallery{ padding:16px; }
-    .detail-info{ padding:24px 20px 28px; }
-    .detail-thumbs{ gap:8px; }
-    .detail-thumb{ width:52px; height:52px; }
-    .detail-desc{ font-size:16px; line-height:1.7; }
+    .detail{ padding:0 0 120px; }
+    .detail-back{ padding:20px 14px 16px; display:flex; }
+    .detail-card{ border-radius:0; box-shadow:none; }
+    .detail-gallery{ padding:0; }
+    .detail-hero{ aspect-ratio:1; border-radius:0; }
+    .detail-info{ padding:22px 16px 32px; }
+    .detail-name{ font-size:30px; }
+    .detail-thumbs{ gap:8px; padding:0 16px 16px; }
+    .detail-thumb{ width:56px; height:56px; }
+    .detail-desc{ font-size:15px; line-height:1.7; }
     .detail-specs{ grid-template-columns:1fr; gap:14px; }
     .pairing-item, .pairing-item .ph{ flex-basis:120px; }
     .pairing-item .ph{ width:120px; height:120px; }
+
+    /* CTA del detalle: sticky en el fondo del móvil */
+    .detail-priceblock{ position:fixed; bottom:0; left:0; right:0; z-index:110;
+      background:var(--card); border-top:1px solid var(--line);
+      padding:12px 16px calc(12px + env(safe-area-inset-bottom));
+      display:flex; align-items:center; gap:12px; box-shadow:0 -8px 24px rgba(42,37,31,.1); }
+    .detail-price{ flex:1; }
+    .detail-price small{ display:block; font-size:10px; }
+    .detail-priceblock .btn.ghost.small{ display:none; }
+    .detail-priceblock .wa-btn{ flex:1; text-align:center; justify-content:center; padding:13px 16px; font-size:11px; margin-top:0 !important; }
+    .detail-wa-inline{ display:none; }
+
+    /* ---- Tab de ofertas: oculto en móvil (el WA flota) ---- */
+    .lead-tab{ display:none; }
+
+    /* ---- WhatsApp flotante ---- */
+    .wa-float{ width:54px; height:54px; bottom:calc(72px + env(safe-area-inset-bottom)); }
+    .wa-float svg{ width:27px; height:27px; }
 
     /* ---- Editor (modo edición) ---- */
     .drawer-head{ padding:18px 18px 16px; }
@@ -526,12 +557,9 @@ body{background:var(--paper);color:var(--ink);font-family:var(--sans);-webkit-fo
     .sel-actions{ width:100%; flex-direction:row; gap:8px; }
     .sel-btn{ flex:1; text-align:center; padding:12px 10px; }
 
-    /* ---- WhatsApp flotante ---- */
-    .wa-float{ width:54px; height:54px; bottom:calc(16px + env(safe-area-inset-bottom)); }
-    .wa-float svg{ width:27px; height:27px; }
-
     /* ---- Lightbox ---- */
     .lightbox-cap{ font-size:16px; text-align:center; padding:0 12px; }
+    .toast{ bottom:calc(80px + env(safe-area-inset-bottom)); }
   }
 
   /* ---------- CELULARES PEQUEÑOS (≤400px) ---------- */
@@ -967,11 +995,20 @@ const Icon = ({ name, ...p }) => {
   );
 };
 
-const Img = ({ src, label = "Foto del mueble", className = "", eager = false }) => (
-  <div className={"ph " + (src ? "has-img " : "") + className} data-label={label}>
-    {src ? <img src={src} alt={label} loading={eager ? "eager" : "lazy"} decoding="async" /> : null}
-  </div>
-);
+const Img = ({ src, label = "Foto del mueble", className = "", eager = false }) => {
+  const ref = React.useRef(null);
+  React.useEffect(() => {
+    const img = ref.current;
+    if (!img) return;
+    if (img.complete) { img.classList.add("loaded"); img.parentElement && img.parentElement.classList.add("loaded"); }
+    else { img.onload = () => { img.classList.add("loaded"); img.parentElement && img.parentElement.classList.add("loaded"); }; }
+  }, [src]);
+  return (
+    <div className={"ph " + (src ? "has-img " : "") + className} data-label={label}>
+      {src ? <img ref={ref} src={src} alt={label} loading={eager ? "eager" : "lazy"} decoding="async" /> : null}
+    </div>
+  );
+};
 
 const StatusBadge = ({ status }) => {
   const s = window.CASA.STATUS[status] || window.CASA.STATUS.almacen;
@@ -1512,7 +1549,7 @@ const Detail = ({ item, related, onBack, onOpen, onShare }) => {
                 <Icon name="share" /> Compartir
               </button>
             </div>
-            <a className="wa-btn block" href={waLink(waPieceMessage(item))} target="_blank" rel="noopener noreferrer"
+            <a className="wa-btn block detail-wa-inline" href={waLink(waPieceMessage(item))} target="_blank" rel="noopener noreferrer"
                style={{ marginTop: 22 }}>
               <WAIcon /> Comunícate con un asesor
             </a>
@@ -2279,7 +2316,7 @@ function App() {
     setCoverUploading(false);
   };
 
-  /* Hash para selección de cliente */
+  /* Hash para selección de cliente o producto directo */
   useEffect(() => {
     const h = window.location.hash || "";
     if (h.indexOf("seleccion=") !== -1) {
@@ -2292,8 +2329,15 @@ function App() {
         setClientOwner(false);
         setView("client");
       }
+    } else if (h.indexOf("producto=") !== -1) {
+      const params = new URLSearchParams(h.slice(1));
+      const pid = params.get("producto");
+      if (pid && items.length > 0) {
+        const found = items.find((p) => p.id === pid && !p.hidden);
+        if (found) { setCurrent(found); setDetailReturn("catalog"); setView("detail"); }
+      }
     }
-  }, []);
+  }, [items]);
 
   const flash = useCallback((msg) => {
     setToast(msg); clearTimeout(flash._t);
@@ -2374,9 +2418,16 @@ function App() {
   };
 
   const shareProduct = () => {
-    const url = window.location.href.split("#")[0];
-    if (navigator.clipboard) navigator.clipboard.writeText(url).catch(() => {});
-    flash("Enlace del catálogo copiado");
+    const base = window.location.origin + window.location.pathname;
+    const url = base + "#producto=" + (current ? current.id : "");
+    const title = current ? current.name + " — Casa DAMS" : "Casa DAMS";
+    const text = current ? "Mirá este mueble en el catálogo de Casa DAMS: " + current.name : "Catálogo Casa DAMS";
+    if (navigator.share) {
+      navigator.share({ title, text, url }).catch(() => {});
+    } else if (navigator.clipboard) {
+      navigator.clipboard.writeText(url).catch(() => {});
+      flash("Enlace copiado");
+    }
   };
 
   const related = current
