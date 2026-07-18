@@ -150,6 +150,7 @@ body{background:var(--paper);color:var(--ink);font-family:var(--sans);-webkit-fo
 @media(prefers-reduced-motion:reduce){.wa-float::before{animation:none;}.cover-hero .ph{animation:none;}}
 /* POPUP DE CAPTACIÓN — aparece automático estilo boutique */
 .lead-overlay{position:fixed;inset:0;z-index:500;background:rgba(20,16,12,.65);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;animation:fadeIn .35s var(--ease);padding:20px;}
+@keyframes slideUp{from{transform:translateY(100%);}to{transform:translateY(0);}}
 .lead-box{background:var(--card);border-radius:24px;width:min(420px,100%);box-shadow:var(--shadow-lift);display:flex;flex-direction:column;overflow:hidden;position:relative;}
 .lead-box-hero{background:var(--ink);padding:32px 32px 28px;text-align:center;position:relative;}
 .lead-box-hero::after{content:"";position:absolute;bottom:-1px;left:0;right:0;height:24px;background:var(--card);border-radius:24px 24px 0 0;}
@@ -179,9 +180,26 @@ body{background:var(--paper);color:var(--ink);font-family:var(--sans);-webkit-fo
 .lead-success-body h3{font-family:var(--display);font-size:28px;font-style:italic;font-weight:400;margin:0 0 10px;color:var(--ink);}
 .lead-success-body p{font-family:var(--serif);font-size:16px;color:var(--ink-2);line-height:1.65;margin:0 0 26px;}
 @media(max-width:600px){
-  .lead-box-discount{font-size:42px;}
-  .lead-box-hero{padding:26px 24px 22px;}
-  .lead-box-body{padding:22px 22px 26px;}
+  /* Bottom sheet en móvil */
+  .lead-overlay{align-items:flex-end;justify-content:center;padding:0;}
+  .lead-box{border-radius:20px 20px 0 0;width:100%;max-height:92dvh;overflow-y:auto;-webkit-overflow-scrolling:touch;animation:slideUp .38s var(--ease) both;}
+  /* Handle visual de bottom sheet */
+  .lead-box::before{content:"";display:block;width:38px;height:4px;border-radius:999px;background:rgba(234,226,214,.25);margin:10px auto 0;position:absolute;top:0;left:50%;transform:translateX(-50%);}
+  /* Hero más compacto */
+  .lead-box-hero{padding:28px 20px 18px;}
+  .lead-box-discount{font-size:34px;line-height:1.05;}
+  .lead-box-subtitle{font-size:10px;letter-spacing:.18em;}
+  .lead-box-hero .kicker{font-size:9px;margin-bottom:6px;}
+  /* Body más compacto */
+  .lead-box-body{padding:18px 18px 28px;}
+  .lead-box-desc{font-size:14px;margin-bottom:14px;}
+  /* Campos más delgados */
+  .lead-fields{gap:8px;margin-bottom:10px;}
+  .lead-field input{padding:11px 14px;font-size:14px;}
+  .lead-privacy{margin-bottom:12px;}
+  .lead-privacy span{font-size:10px;}
+  .lead-submit{padding:13px;font-size:11px;margin-bottom:8px;}
+  .lead-skip{padding:10px;font-size:10px;}
 }
 /* PESTAÑA FIJA DE OFERTAS */
 .lead-tab{position:fixed;right:0;top:50%;transform:translateY(-50%);z-index:119;background:var(--ink);color:var(--paper);border:none;cursor:pointer;padding:14px 10px;border-radius:8px 0 0 8px;display:flex;align-items:center;justify-content:center;box-shadow:-4px 0 18px rgba(42,37,31,.25);transition:background .25s var(--ease),transform .25s var(--ease);writing-mode:vertical-rl;text-orientation:mixed;}
